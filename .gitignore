@@ -87,7 +87,6 @@ application-*.yml
 .env.*
 docker-compose.*.yml
 docker-compose.yml
-.jenkinsfile
 
 ### Node.js (for frontend) ###
 node_modules/
