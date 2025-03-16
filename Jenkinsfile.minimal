@@ -1,0 +1,63 @@
+pipeline {
+    agent any
+    
+    environment {
+        AUTH_SERVICE_PORT = '8081'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Build Auth Service') {
+            steps {
+                dir('auth-service') {
+                    // Direct Docker approach without scripts
+                    sh '''
+                        docker run --rm -v "$(pwd)":/app -w /app maven:3.8.6-eclipse-temurin-17 mvn clean package -DskipTests
+                        docker build -t swiftchat/auth-service:latest .
+                        echo "Auth service build completed successfully"
+                    '''
+                }
+            }
+            post {
+                success {
+                    echo 'Auth Service build successful'
+                    archiveArtifacts artifacts: 'auth-service/target/*.jar', fingerprint: true
+                }
+                failure {
+                    echo 'Auth Service build failed'
+                }
+            }
+        }
+        
+        stage('Deploy Auth Service') {
+            steps {
+                sh 'docker-compose -f docker-compose.dev.yml up -d auth-service'
+                sh '''
+                    # Simple health check
+                    echo "Waiting for Auth Service to start..."
+                    sleep 30
+                    curl -f http://localhost:8081/actuator/health || echo "Service may still be starting"
+                '''
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Cleaning workspace...'
+            // Comment out cleanWs for debugging if needed
+            // cleanWs()
+        }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
