@@ -3,6 +3,8 @@ pipeline {
     
     environment {
         AUTH_SERVICE_PORT = '8081'
+        // Flag to track if Docker is available
+        DOCKER_AVAILABLE = false
     }
     
     stages {
@@ -12,15 +14,55 @@ pipeline {
             }
         }
         
+        stage('Check Docker Availability') {
+            steps {
+                script {
+                    try {
+                        sh 'docker --version'
+                        echo "Docker is available"
+                        env.DOCKER_AVAILABLE = 'true'
+                    } catch (Exception e) {
+                        echo "Docker is not available: ${e.message}"
+                        echo "Will attempt alternative build approaches"
+                        env.DOCKER_AVAILABLE = 'false'
+                    }
+                }
+            }
+        }
+        
         stage('Build Auth Service') {
             steps {
                 dir('auth-service') {
-                    // Direct Docker approach without scripts
-                    sh '''
-                        docker run --rm -v "$(pwd)":/app -w /app maven:3.8.6-eclipse-temurin-17 mvn clean package -DskipTests
-                        docker build -t swiftchat/auth-service:latest .
-                        echo "Auth service build completed successfully"
-                    '''
+                    script {
+                        if (env.DOCKER_AVAILABLE == 'true') {
+                            // Docker is available, use Docker approach
+                            try {
+                                sh '''
+                                    docker run --rm -v "$(pwd)":/app -w /app maven:3.8.6-eclipse-temurin-17 mvn clean package -DskipTests
+                                    docker build -t swiftchat/auth-service:latest .
+                                    echo "Auth service build completed successfully using Docker"
+                                '''
+                            } catch (Exception e) {
+                                echo "Docker build failed: ${e.message}"
+                                echo "Attempting traditional build..."
+                                sh 'mvn clean package -DskipTests'
+                            }
+                        } else {
+                            // Docker is not available, try direct Maven if installed
+                            echo "Docker not available, attempting to build with local Maven"
+                            sh '''
+                                # Check for Maven
+                                if command -v mvn &> /dev/null; then
+                                    echo "Using local Maven installation"
+                                    mvn clean package -DskipTests
+                                else {
+                                    echo "ERROR: Neither Docker nor Maven is available"
+                                    echo "Please install Docker or Maven to build this project"
+                                    exit 1
+                                fi
+                            '''
+                        }
+                    }
                 }
             }
             post {
@@ -35,6 +77,9 @@ pipeline {
         }
         
         stage('Deploy Auth Service') {
+            when {
+                expression { return env.DOCKER_AVAILABLE == 'true' }
+            }
             steps {
                 sh 'docker-compose -f docker-compose.dev.yml up -d auth-service'
                 sh '''
@@ -43,6 +88,16 @@ pipeline {
                     sleep 30
                     curl -f http://localhost:8081/actuator/health || echo "Service may still be starting"
                 '''
+            }
+            post {
+                failure {
+                    echo '''
+                        WARNING: Deploy stage failed. This is likely because Docker is not available.
+                        To deploy manually:
+                        1. Install Docker and Docker Compose
+                        2. Run: docker-compose -f docker-compose.dev.yml up -d auth-service
+                    '''
+                }
             }
         }
     }
@@ -58,6 +113,7 @@ pipeline {
         }
         failure {
             echo 'Pipeline failed!'
+            echo 'Please ensure Docker is installed and accessible to the Jenkins user'
         }
     }
 }
