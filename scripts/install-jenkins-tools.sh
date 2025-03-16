@@ -20,7 +20,7 @@ run_cmd() {
     sudo $@
   else
     $@
-  fi
+  }
 }
 
 # Install Docker if not present
