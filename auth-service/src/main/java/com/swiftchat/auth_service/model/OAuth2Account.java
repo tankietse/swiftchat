@@ -25,7 +25,7 @@ public class OAuth2Account {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @Column(name = "provider", nullable = false, length = 50)
@@ -33,6 +33,15 @@ public class OAuth2Account {
 
     @Column(name = "provider_id", nullable = false, length = 255)
     private String providerId;
+
+    @Column(name = "access_token")
+    private String accessToken;
+
+    @Column(name = "refresh_token")
+    private String refreshToken;
+
+    @Column(name = "expires_at")
+    private Long expiresAt;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

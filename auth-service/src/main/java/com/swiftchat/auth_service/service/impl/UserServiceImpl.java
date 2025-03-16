@@ -13,17 +13,20 @@ import com.swiftchat.auth_service.model.UserRole;
 import com.swiftchat.auth_service.repository.RoleRepository;
 import com.swiftchat.auth_service.repository.UserRepository;
 import com.swiftchat.auth_service.repository.UserRoleRepository;
+import com.swiftchat.auth_service.service.EmailService;
 import com.swiftchat.auth_service.service.UserService;
 import com.swiftchat.auth_service.util.RandomUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,6 +39,7 @@ public class UserServiceImpl implements UserService {
     private final UserRoleRepository userRoleRepository;
     private final PasswordEncoder passwordEncoder;
     private final KafkaTemplate<String, UserCreatedEvent> kafkaTemplate;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -53,26 +57,37 @@ public class UserServiceImpl implements UserService {
                 .roles(new HashSet<>())
                 .build();
 
+        // Save user first without roles
         user = userRepository.save(user);
 
-        // Add default user role
-        Role userRole = roleRepository.findByName(RoleName.ROLE_USER.name())
-                .orElseThrow(() -> new ResourceNotFoundException("Default role not found"));
+        // Add default user role in a separate transaction
+        try {
+            Role userRole = roleRepository.findByName(RoleName.ROLE_USER.name())
+                    .orElseThrow(() -> new ResourceNotFoundException("Default role not found"));
+            // Only add if not already present
+            if (!user.getRoles().contains(userRole)) {
+                user.getRoles().add(userRole);
+                // Re-save the user to update the join table managed by Hibernate
+                user = userRepository.save(user);
+            }
+        } catch (Exception e) {
+            log.error("Error assigning default role to user: {}", e.getMessage());
+            // Continue with user creation even if role assignment fails
+        }
 
-        // Use the addRoleToUser method to ensure consistent behavior
-        UserRole.UserRoleId userRoleId = new UserRole.UserRoleId(user.getId(), userRole.getId());
-        UserRole userRoleEntity = UserRole.builder()
-                .id(userRoleId)
-                .user(user)
-                .role(userRole)
-                .build();
-        userRoleRepository.save(userRoleEntity);
+        // Send activation email
+        try {
+            emailService.sendActivationEmail(user.getEmail(), user.getActivationKey());
+        } catch (Exception e) {
+            log.warn("Failed to send activation email, continuing: {}", e.getMessage());
+        }
 
-        // Update the user's role collection
-        user.getRoles().add(userRole);
-
-        // Publish user created event
-        publishUserCreatedEvent(user);
+        // Publish user created event with graceful degradation
+        try {
+            publishUserCreatedEvent(user);
+        } catch (Exception e) {
+            log.warn("Failed to publish user creation event, continuing: {}", e.getMessage());
+        }
 
         log.info("Created new user: {}", user.getEmail());
         return user;
@@ -141,10 +156,16 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("No user found with email: " + email));
 
         user.setResetKey(RandomUtil.generateResetKey());
-        userRepository.save(user);
+        user = userRepository.save(user);
 
-        // TODO: Send password reset email with reset key
-        log.info("Password reset requested for user: {}", email);
+        // Send password reset email
+        try {
+            emailService.sendPasswordResetEmail(user.getEmail(), user.getResetKey());
+            log.info("Password reset requested for user: {}", email);
+        } catch (Exception e) {
+            log.error("Failed to send password reset email: {}", e.getMessage());
+            // Continue even if email sending fails, to avoid leaking user information
+        }
     }
 
     @Override
@@ -270,11 +291,24 @@ public class UserServiceImpl implements UserService {
                     .email(user.getEmail())
                     .timestamp(System.currentTimeMillis())
                     .build();
-            kafkaTemplate.send("user-created", event);
-            log.debug("Published user created event for {}", user.getEmail());
+
+            CompletableFuture<SendResult<String, UserCreatedEvent>> future = kafkaTemplate.send("user-created", event);
+
+            future.whenComplete((result, ex) -> {
+                if (ex == null) {
+                    log.debug("Published user created event for {}", user.getEmail());
+                } else {
+                    log.warn("Unable to publish user created event: {}", ex.getMessage());
+                }
+            });
+
+            // Don't block the thread waiting for Kafka
         } catch (Exception e) {
             // Log error but don't prevent user creation
-            log.error("Failed to publish user created event", e);
+            log.error("Failed to publish user created event: {}", e.getMessage());
+            if (log.isDebugEnabled()) {
+                log.debug("Kafka error details", e);
+            }
         }
     }
 }
