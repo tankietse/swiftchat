@@ -49,7 +49,7 @@ pipeline {
                         }
                         failure {
                             echo 'Auth Service build failed'
-                            mail to: 'team@swiftchat.com',
+                            mail to: 'tankiet.work@gmail.com',
                                  subject: "Build Failed: Auth Service - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                                  body: "Check console output at ${env.BUILD_URL}"
                         }
