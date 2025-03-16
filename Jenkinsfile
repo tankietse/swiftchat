@@ -4,6 +4,7 @@ pipeline {
     environment {
         DOCKER_REGISTRY = 'your-registry-url'
         DOCKER_CREDENTIALS_ID = 'docker-cred-id'
+        AUTH_SERVICE_PORT = '8081'
     }
     
     stages {
@@ -36,8 +37,21 @@ pipeline {
                 stage('Build Auth Service') {
                     steps {
                         dir('auth-service') {
-                            sh 'mvn clean package -DskipTests'
+                            sh 'mvn clean package'
                             sh 'docker build -t swiftchat/auth-service:${BUILD_NUMBER} -t swiftchat/auth-service:latest .'
+                            sh 'echo "Auth service build completed successfully"'
+                        }
+                    }
+                    post {
+                        success {
+                            echo 'Auth Service build successful'
+                            archiveArtifacts artifacts: 'auth-service/target/*.jar', fingerprint: true
+                        }
+                        failure {
+                            echo 'Auth Service build failed'
+                            mail to: 'team@swiftchat.com',
+                                 subject: "Build Failed: Auth Service - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                                 body: "Check console output at ${env.BUILD_URL}"
                         }
                     }
                 }
@@ -86,6 +100,16 @@ pipeline {
             }
         }
         
+        stage('Test Auth Service') {
+            steps {
+                dir('auth-service') {
+                    sh 'mvn test'
+                    junit '**/target/surefire-reports/*.xml'
+                    jacoco execPattern: 'target/jacoco.exec'
+                }
+            }
+        }
+        
         stage('Push Images') {
             when {
                 branch 'main'
@@ -127,6 +151,34 @@ pipeline {
             }
         }
         
+        stage('Deploy Auth Service to Dev') {
+            when {
+                branch 'develop'
+            }
+            steps {
+                sh 'docker-compose -f docker-compose.dev.yml up -d auth-service'
+                sh """
+                    # Wait for auth-service to be healthy
+                    max_attempts=12
+                    counter=0
+                    echo "Waiting for Auth Service to become available..."
+                    until curl -s http://localhost:${AUTH_SERVICE_PORT}/actuator/health | grep -q "UP" || [ \$counter -eq \$max_attempts ]
+                    do
+                      sleep 10
+                      counter=\$((counter + 1))
+                      echo "Attempt \$counter of \$max_attempts"
+                    done
+                    
+                    if [ \$counter -eq \$max_attempts ]; then
+                      echo "Failed to start Auth Service"
+                      exit 1
+                    else
+                      echo "Auth Service started successfully"
+                    fi
+                """
+            }
+        }
+        
         stage('Deploy to Production') {
             when {
                 branch 'main'
@@ -144,10 +196,14 @@ pipeline {
         }
         success {
             echo 'Pipeline completed successfully!'
+            slackSend(color: 'good', message: "Auth Service build successful: ${env.JOB_NAME} #${env.BUILD_NUMBER}")
         }
         failure {
             echo 'Pipeline failed!'
-            // Add notification steps here (email, Slack, etc.)
+            slackSend(color: 'danger', message: "Auth Service build failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}")
+            mail to: 'team@swiftchat.com',
+                 subject: "Build Failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                 body: "Check console output at ${env.BUILD_URL}"
         }
     }
 }

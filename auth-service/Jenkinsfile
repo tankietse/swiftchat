@@ -1,0 +1,100 @@
+pipeline {
+    agent any
+    
+    environment {
+        SERVICE_NAME = 'auth-service'
+        SERVICE_PORT = '8081'
+        DOCKER_REGISTRY = 'your-registry-url'
+        DOCKER_CREDENTIALS_ID = 'docker-cred-id'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh 'mvn clean package'
+                sh 'docker build -t swiftchat/${SERVICE_NAME}:${BUILD_NUMBER} -t swiftchat/${SERVICE_NAME}:latest .'
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                }
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                sh 'mvn test'
+                junit '**/target/surefire-reports/*.xml'
+            }
+        }
+        
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarServer') {
+                    sh 'mvn sonar:sonar'
+                }
+            }
+        }
+        
+        stage('Push Image') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            steps {
+                withCredentials([string(credentialsId: "${DOCKER_CREDENTIALS_ID}", variable: 'DOCKER_PWD')]) {
+                    sh 'echo $DOCKER_PWD | docker login ${DOCKER_REGISTRY} -u username --password-stdin'
+                    sh 'docker tag swiftchat/${SERVICE_NAME}:latest ${DOCKER_REGISTRY}/swiftchat/${SERVICE_NAME}:latest'
+                    sh 'docker push ${DOCKER_REGISTRY}/swiftchat/${SERVICE_NAME}:latest'
+                    sh 'docker tag swiftchat/${SERVICE_NAME}:${BUILD_NUMBER} ${DOCKER_REGISTRY}/swiftchat/${SERVICE_NAME}:${BUILD_NUMBER}'
+                    sh 'docker push ${DOCKER_REGISTRY}/swiftchat/${SERVICE_NAME}:${BUILD_NUMBER}'
+                }
+            }
+        }
+        
+        stage('Deploy to Dev') {
+            when {
+                branch 'develop'
+            }
+            steps {
+                sh 'docker-compose -f docker-compose.dev.yml up -d ${SERVICE_NAME}'
+                sh 'sleep 30' // Give the service time to start
+                sh 'curl -f http://localhost:${SERVICE_PORT}/actuator/health || (echo "Service health check failed" && exit 1)'
+            }
+        }
+        
+        stage('Deploy to Production') {
+            when {
+                branch 'main'
+            }
+            steps {
+                input message: 'Deploy to production?', ok: 'Deploy'
+                sh 'docker-compose -f docker-compose.prod.yml up -d ${SERVICE_NAME}'
+                sh 'sleep 60' // Give the service time to start
+                sh 'curl -f http://localhost:${SERVICE_PORT}/actuator/health || (echo "Service health check failed" && exit 1)'
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo '${SERVICE_NAME} pipeline completed successfully!'
+            // Add notification steps here (email, Slack, etc.)
+        }
+        failure {
+            echo '${SERVICE_NAME} pipeline failed!'
+            // Add notification steps here (email, Slack, etc.)
+        }
+    }
+}
