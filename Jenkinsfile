@@ -1,16 +1,10 @@
 pipeline {
     agent any
     
-    tools {
-        maven 'Maven 3'  // Use the Maven installation configured in Jenkins
-        jdk 'JDK 17'     // Use the JDK installation configured in Jenkins
-    }
-    
     environment {
         DOCKER_REGISTRY = 'your-registry-url'
         DOCKER_CREDENTIALS_ID = 'docker-cred-id'
         AUTH_SERVICE_PORT = '8081'
-        PATH = "${tool 'Maven 3'}/bin:${env.PATH}"  // Ensure Maven is in PATH
     }
     
     stages {
@@ -25,7 +19,7 @@ pipeline {
                 stage('Build API Gateway') {
                     steps {
                         dir('api-gateway') {
-                            sh "${tool 'Maven 3'}/bin/mvn clean package -DskipTests"
+                            sh './scripts/jenkins-mvn.sh clean package -DskipTests'
                             sh 'docker build -t swiftchat/api-gateway:${BUILD_NUMBER} -t swiftchat/api-gateway:latest .'
                         }
                     }
@@ -34,7 +28,7 @@ pipeline {
                 stage('Build Service Registry') {
                     steps {
                         dir('service-registry') {
-                            sh "${tool 'Maven 3'}/bin/mvn clean package -DskipTests"
+                            sh './scripts/jenkins-mvn.sh clean package -DskipTests'
                             sh 'docker build -t swiftchat/service-registry:${BUILD_NUMBER} -t swiftchat/service-registry:latest .'
                         }
                     }
@@ -43,7 +37,7 @@ pipeline {
                 stage('Build Auth Service') {
                     steps {
                         dir('auth-service') {
-                            sh "${tool 'Maven 3'}/bin/mvn clean package"
+                            sh '../scripts/jenkins-mvn.sh clean package'
                             sh 'docker build -t swiftchat/auth-service:${BUILD_NUMBER} -t swiftchat/auth-service:latest .'
                             sh 'echo "Auth service build completed successfully"'
                         }
@@ -65,7 +59,7 @@ pipeline {
                 stage('Build User Service') {
                     steps {
                         dir('user-service') {
-                            sh "${tool 'Maven 3'}/bin/mvn clean package -DskipTests"
+                            sh './scripts/jenkins-mvn.sh clean package -DskipTests'
                             sh 'docker build -t swiftchat/user-service:${BUILD_NUMBER} -t swiftchat/user-service:latest .'
                         }
                     }
@@ -74,7 +68,7 @@ pipeline {
                 stage('Build Chat Service') {
                     steps {
                         dir('chat-service') {
-                            sh "${tool 'Maven 3'}/bin/mvn clean package -DskipTests"
+                            sh './scripts/jenkins-mvn.sh clean package -DskipTests'
                             sh 'docker build -t swiftchat/chat-service:${BUILD_NUMBER} -t swiftchat/chat-service:latest .'
                         }
                     }
@@ -83,7 +77,7 @@ pipeline {
                 stage('Build Notification Service') {
                     steps {
                         dir('notification-service') {
-                            sh "${tool 'Maven 3'}/bin/mvn clean package -DskipTests"
+                            sh './scripts/jenkins-mvn.sh clean package -DskipTests'
                             sh 'docker build -t swiftchat/notification-service:${BUILD_NUMBER} -t swiftchat/notification-service:latest .'
                         }
                     }
@@ -92,7 +86,7 @@ pipeline {
                 stage('Build File Service') {
                     steps {
                         dir('file-service') {
-                            sh "${tool 'Maven 3'}/bin/mvn clean package -DskipTests"
+                            sh './scripts/jenkins-mvn.sh clean package -DskipTests'
                             sh 'docker build -t swiftchat/file-service:${BUILD_NUMBER} -t swiftchat/file-service:latest .'
                         }
                     }
@@ -102,14 +96,14 @@ pipeline {
         
         stage('Run Tests') {
             steps {
-                sh "${tool 'Maven 3'}/bin/mvn test"
+                sh './scripts/jenkins-mvn.sh test'
             }
         }
         
         stage('Test Auth Service') {
             steps {
                 dir('auth-service') {
-                    sh "${tool 'Maven 3'}/bin/mvn test"
+                    sh '../scripts/jenkins-mvn.sh test'
                     junit '**/target/surefire-reports/*.xml'
                     jacoco execPattern: 'target/jacoco.exec'
                 }
