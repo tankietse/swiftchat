@@ -5,6 +5,8 @@ pipeline {
         DOCKER_REGISTRY = 'your-registry-url'
         DOCKER_CREDENTIALS_ID = 'docker-cred-id'
         AUTH_SERVICE_PORT = '8081'
+        // Use a direct docker maven command instead of relying on scripts
+        MVN_CMD = 'docker run --rm -v "$(pwd)":/app -w /app maven:3.8.6-eclipse-temurin-17 mvn'
     }
     
     stages {
@@ -14,12 +16,21 @@ pipeline {
             }
         }
         
+        stage('Setup Environment') {
+            steps {
+                // Make sure docker is accessible
+                sh 'docker --version'
+                // Create a scripts directory in workspace if it doesn't exist
+                sh 'mkdir -p scripts'
+            }
+        }
+        
         stage('Build Microservices') {
             parallel {
                 stage('Build API Gateway') {
                     steps {
                         dir('api-gateway') {
-                            sh './scripts/jenkins-mvn.sh clean package -DskipTests'
+                            sh '${MVN_CMD} clean package -DskipTests'
                             sh 'docker build -t swiftchat/api-gateway:${BUILD_NUMBER} -t swiftchat/api-gateway:latest .'
                         }
                     }
@@ -28,7 +39,7 @@ pipeline {
                 stage('Build Service Registry') {
                     steps {
                         dir('service-registry') {
-                            sh './scripts/jenkins-mvn.sh clean package -DskipTests'
+                            sh '${MVN_CMD} clean package -DskipTests'
                             sh 'docker build -t swiftchat/service-registry:${BUILD_NUMBER} -t swiftchat/service-registry:latest .'
                         }
                     }
@@ -37,7 +48,7 @@ pipeline {
                 stage('Build Auth Service') {
                     steps {
                         dir('auth-service') {
-                            sh '../scripts/jenkins-mvn.sh clean package'
+                            sh '${MVN_CMD} clean package'
                             sh 'docker build -t swiftchat/auth-service:${BUILD_NUMBER} -t swiftchat/auth-service:latest .'
                             sh 'echo "Auth service build completed successfully"'
                         }
@@ -49,9 +60,7 @@ pipeline {
                         }
                         failure {
                             echo 'Auth Service build failed'
-                            mail to: 'tankiet.work@gmail.com',
-                                 subject: "Build Failed: Auth Service - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                                 body: "Check console output at ${env.BUILD_URL}"
+                            // Remove email step to avoid connection errors
                         }
                     }
                 }
@@ -59,7 +68,7 @@ pipeline {
                 stage('Build User Service') {
                     steps {
                         dir('user-service') {
-                            sh './scripts/jenkins-mvn.sh clean package -DskipTests'
+                            sh '${MVN_CMD} clean package -DskipTests'
                             sh 'docker build -t swiftchat/user-service:${BUILD_NUMBER} -t swiftchat/user-service:latest .'
                         }
                     }
@@ -68,7 +77,7 @@ pipeline {
                 stage('Build Chat Service') {
                     steps {
                         dir('chat-service') {
-                            sh './scripts/jenkins-mvn.sh clean package -DskipTests'
+                            sh '${MVN_CMD} clean package -DskipTests'
                             sh 'docker build -t swiftchat/chat-service:${BUILD_NUMBER} -t swiftchat/chat-service:latest .'
                         }
                     }
@@ -77,7 +86,7 @@ pipeline {
                 stage('Build Notification Service') {
                     steps {
                         dir('notification-service') {
-                            sh './scripts/jenkins-mvn.sh clean package -DskipTests'
+                            sh '${MVN_CMD} clean package -DskipTests'
                             sh 'docker build -t swiftchat/notification-service:${BUILD_NUMBER} -t swiftchat/notification-service:latest .'
                         }
                     }
@@ -86,7 +95,7 @@ pipeline {
                 stage('Build File Service') {
                     steps {
                         dir('file-service') {
-                            sh './scripts/jenkins-mvn.sh clean package -DskipTests'
+                            sh '${MVN_CMD} clean package -DskipTests'
                             sh 'docker build -t swiftchat/file-service:${BUILD_NUMBER} -t swiftchat/file-service:latest .'
                         }
                     }
@@ -96,14 +105,14 @@ pipeline {
         
         stage('Run Tests') {
             steps {
-                sh './scripts/jenkins-mvn.sh test'
+                sh '${MVN_CMD} test'
             }
         }
         
         stage('Test Auth Service') {
             steps {
                 dir('auth-service') {
-                    sh '../scripts/jenkins-mvn.sh test'
+                    sh '${MVN_CMD} test'
                     junit '**/target/surefire-reports/*.xml'
                     jacoco execPattern: 'target/jacoco.exec'
                 }
@@ -196,14 +205,11 @@ pipeline {
         }
         success {
             echo 'Pipeline completed successfully!'
-            slackSend(color: 'good', message: "Auth Service build successful: ${env.JOB_NAME} #${env.BUILD_NUMBER}")
+            // Remove slackSend until properly configured
         }
         failure {
             echo 'Pipeline failed!'
-            slackSend(color: 'danger', message: "Auth Service build failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}")
-            mail to: 'team@swiftchat.com',
-                 subject: "Build Failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: "Check console output at ${env.BUILD_URL}"
+            // Remove notifications until properly configured
         }
     }
 }
