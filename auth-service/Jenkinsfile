@@ -20,7 +20,7 @@ pipeline {
         
         stage('Build Shared Libraries') {
             steps {
-                dir('../shared-libs') {
+                dir('${WORKSPACE}/../shared-libs') {
                     sh '${MVN_CMD} clean install -DskipTests'
                 }
             }
