@@ -262,11 +262,13 @@ class RefreshTokenServiceImplTest {
             // Arrange
             List<RefreshToken> expiredTokens = Arrays.asList(expiredRefreshToken);
             when(refreshTokenRepository.findAllExpiredTokens(any(LocalDateTime.class))).thenReturn(expiredTokens);
+            doNothing().when(refreshTokenRepository).deleteAllExpiredTokens(any(LocalDateTime.class));
 
             // Act
-            refreshTokenService.deleteExpiredTokens();
+            int result = refreshTokenService.deleteExpiredTokens();
 
             // Assert
+            assertEquals(1, result); // Should return the count of expired tokens found
             verify(refreshTokenRepository).deleteAllExpiredTokens(any(LocalDateTime.class));
         }
 
@@ -277,8 +279,9 @@ class RefreshTokenServiceImplTest {
             when(refreshTokenRepository.findAllExpiredTokens(any(LocalDateTime.class)))
                     .thenThrow(new RuntimeException("Database error"));
 
-            // Act & Assert (should not throw exception)
-            assertDoesNotThrow(() -> refreshTokenService.deleteExpiredTokens());
+            // Act & Assert (should not throw exception and return 0)
+            int result = assertDoesNotThrow(() -> refreshTokenService.deleteExpiredTokens());
+            assertEquals(0, result);
         }
     }
 
