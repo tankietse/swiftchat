@@ -4,9 +4,10 @@ pipeline {
     environment {
         SERVICE_NAME = 'auth-service'
         SERVICE_PORT = '8081'
-        DOCKER_REGISTRY = 'your-registry-url'
-        DOCKER_CREDENTIALS_ID = 'docker-cred-id'
-        // Use a direct docker maven command
+        DOCKER_REGISTRY = 'registry.yourcompany.com'  // Replace with your actual Docker registry
+        DOCKER_CREDENTIALS_ID = 'docker-registry-credentials'  // Update to actual credential ID in Jenkins
+        PROD_SERVER = 'user@production-server.com'  // Replace with your production server SSH connection
+        PROD_SERVER_CREDENTIALS_ID = 'prod-server-ssh'  // SSH credentials for production server
         MVN_CMD = 'docker run --rm -v "$(pwd)":/app -w /app maven:3.8.6-eclipse-temurin-17 mvn'
     }
     
@@ -33,27 +34,11 @@ pipeline {
             steps {
                 sh '${MVN_CMD} test'
                 junit '**/target/surefire-reports/*.xml'
-            }
-        }
-        
-        stage('SonarQube Analysis') {
-            when {
-                expression { return false } // Disable until SonarQube is properly configured
-            }
-            steps {
-                withSonarQubeEnv('SonarServer') {
-                    sh '${MVN_CMD} sonar:sonar'
-                }
+                jacoco execPattern: 'target/jacoco.exec'
             }
         }
         
         stage('Push Image') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'develop'
-                }
-            }
             steps {
                 withCredentials([string(credentialsId: "${DOCKER_CREDENTIALS_ID}", variable: 'DOCKER_PWD')]) {
                     sh 'echo $DOCKER_PWD | docker login ${DOCKER_REGISTRY} -u username --password-stdin'
@@ -65,44 +50,43 @@ pipeline {
             }
         }
         
-        stage('Deploy to Dev') {
-            when {
-                branch 'develop'
-            }
-            steps {
-                sh 'docker-compose -f docker-compose.dev.yml up -d ${SERVICE_NAME}'
-                sh '''
-                    # Wait for service to be healthy
-                    max_attempts=12
-                    counter=0
-                    echo "Waiting for Auth Service to become available..."
-                    
-                    until curl -s http://localhost:${SERVICE_PORT}/actuator/health | grep -q "UP" || [ $counter -eq $max_attempts ]
-                    do
-                      sleep 10
-                      counter=$((counter + 1))
-                      echo "Attempt $counter of $max_attempts"
-                    done
-                    
-                    if [ $counter -eq $max_attempts ]; then
-                      echo "Failed to start Auth Service"
-                      exit 1
-                    else
-                      echo "Auth Service started successfully"
-                    fi
-                '''
-            }
-        }
-        
         stage('Deploy to Production') {
-            when {
-                branch 'main'
-            }
             steps {
-                input message: 'Deploy to production?', ok: 'Deploy'
-                sh 'docker-compose -f docker-compose.prod.yml up -d ${SERVICE_NAME}'
-                sh 'sleep 60' // Give the service time to start
-                sh 'curl -f http://localhost:${SERVICE_PORT}/actuator/health || (echo "Service health check failed" && exit 1)'
+                input message: 'Deploy auth-service to production?', ok: 'Deploy'
+                
+                // Copy deployment files to production server
+                sshagent([PROD_SERVER_CREDENTIALS_ID]) {
+                    sh """
+                        ssh ${PROD_SERVER} 'mkdir -p /opt/swiftchat/deployment'
+                        scp docker-compose.prod.yml ${PROD_SERVER}:/opt/swiftchat/
+                        scp ./src/main/resources/application-prod.properties ${PROD_SERVER}:/opt/swiftchat/config/auth-service/
+                        
+                        # Create .env file with secrets
+                        echo 'Creating .env file with necessary secrets'
+                        ssh ${PROD_SERVER} 'cat > /opt/swiftchat/.env << EOL
+DB_USERNAME=postgres
+DB_PASSWORD=\${DB_PROD_PASSWORD}
+JWT_SECRET=\${JWT_PROD_SECRET}
+JWT_EXPIRATION=900
+JWT_REFRESH_EXPIRATION=604800
+REDIS_PASSWORD=\${REDIS_PROD_PASSWORD}
+SSL_KEY_STORE_PASSWORD=\${SSL_KEY_STORE_PASSWORD}
+EOL'
+                        
+                        # Pull latest image and deploy
+                        ssh ${PROD_SERVER} 'cd /opt/swiftchat && docker login ${DOCKER_REGISTRY} -u username -p \${DOCKER_REGISTRY_PASSWORD}'
+                        ssh ${PROD_SERVER} 'cd /opt/swiftchat && docker pull ${DOCKER_REGISTRY}/swiftchat/${SERVICE_NAME}:latest'
+                        ssh ${PROD_SERVER} 'cd /opt/swiftchat && docker-compose -f docker-compose.prod.yml up -d ${SERVICE_NAME}'
+                        
+                        # Wait for service to start
+                        ssh ${PROD_SERVER} 'cd /opt/swiftchat && ./scripts/wait-for-service.sh ${SERVICE_NAME} ${SERVICE_PORT}'
+                    """
+                }
+                
+                // Verify deployment
+                sshagent([PROD_SERVER_CREDENTIALS_ID]) {
+                    sh "ssh ${PROD_SERVER} 'curl -k https://localhost:${SERVICE_PORT}/actuator/health || (echo \"Service health check failed\" && exit 1)'"
+                }
             }
         }
     }
@@ -112,10 +96,11 @@ pipeline {
             cleanWs()
         }
         success {
-            echo 'Pipeline completed successfully!'
+            echo 'Auth Service deployed to production successfully!'
         }
         failure {
-            echo 'Pipeline failed!'
+            echo 'Auth Service deployment failed!'
+            // Add notification steps (email, Slack, etc.)
         }
     }
 }
