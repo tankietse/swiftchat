@@ -6,7 +6,7 @@ pipeline {
         DOCKER_CREDENTIALS_ID = 'docker-cred-id'
         AUTH_SERVICE_PORT = '8081'
         // Use a direct docker maven command instead of relying on scripts
-        MVN_CMD = 'docker run --rm -v "$(pwd)":/app -w /app maven:3.8.6-eclipse-temurin-17 mvn'
+        MVN_CMD = 'docker run --rm -v "$(pwd)":/app -v maven-repo:/root/.m2 -w /app maven:3.8.6-eclipse-temurin-17 mvn'
         DOCKER_AVAILABLE = false
     }
     
@@ -32,6 +32,34 @@ pipeline {
                 }
                 // Create a scripts directory in workspace if it doesn't exist
                 sh 'mkdir -p scripts'
+            }
+        }
+        
+        stage('Build Shared Libraries') {
+            steps {
+                script {
+                    echo "Building common shared libraries..."
+                    
+                    // Build common-utils
+                    dir('common-utils') {
+                        if (env.DOCKER_AVAILABLE == 'true') {
+                            sh '${MVN_CMD} clean install -DskipTests'
+                        } else {
+                            sh 'mvn clean install -DskipTests'
+                        }
+                    }
+                    
+                    // Build security-core
+                    dir('security-core') {
+                        if (env.DOCKER_AVAILABLE == 'true') {
+                            sh '${MVN_CMD} clean install -DskipTests'
+                        } else {
+                            sh 'mvn clean install -DskipTests'
+                        }
+                    }
+                    
+                    echo "Shared libraries built successfully"
+                }
             }
         }
         
