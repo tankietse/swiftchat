@@ -22,6 +22,12 @@ pipeline {
         stage('Build Shared Libraries') {
             steps {
                 script {
+                    // First build the root parent POM
+                    dir('..') {
+                        sh '${MVN_CMD} clean install -N -DskipTests'
+                        echo "Built parent POM successfully"
+                    }
+                    
                     // First build the parent POM
                     dir('../shared-libs') {
                         sh '${MVN_CMD} clean install -N -DskipTests'
