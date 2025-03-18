@@ -40,21 +40,36 @@ pipeline {
                 script {
                     echo "Building common shared libraries..."
                     
-                    // Build common-utils
-                    dir('common-utils') {
+                    // Build shared-libs parent project first
+                    dir('shared-libs') {
                         if (env.DOCKER_AVAILABLE == 'true') {
-                            sh '${MVN_CMD} clean install -DskipTests'
+                            sh '${MVN_CMD} clean install -N -DskipTests'
+                            echo "Built shared-libs parent successfully"
                         } else {
-                            sh 'mvn clean install -DskipTests'
+                            sh 'mvn clean install -N -DskipTests'
+                            echo "Built shared-libs parent successfully"
                         }
-                    }
-                    
-                    // Build security-core
-                    dir('security-core') {
-                        if (env.DOCKER_AVAILABLE == 'true') {
-                            sh '${MVN_CMD} clean install -DskipTests'
-                        } else {
-                            sh 'mvn clean install -DskipTests'
+                        
+                        // Build common-utils
+                        dir('common-utils') {
+                            if (env.DOCKER_AVAILABLE == 'true') {
+                                sh '${MVN_CMD} clean install -DskipTests'
+                                echo "Built common-utils successfully"
+                            } else {
+                                sh 'mvn clean install -DskipTests'
+                                echo "Built common-utils successfully"
+                            }
+                        }
+                        
+                        // Build security-core
+                        dir('security-core') {
+                            if (env.DOCKER_AVAILABLE == 'true') {
+                                sh '${MVN_CMD} clean install -DskipTests'
+                                echo "Built security-core successfully"
+                            } else {
+                                sh 'mvn clean install -DskipTests'
+                                echo "Built security-core successfully"
+                            }
                         }
                     }
                     
