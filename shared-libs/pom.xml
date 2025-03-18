@@ -8,6 +8,7 @@
         <groupId>com.swiftchat</groupId>
         <artifactId>swiftchat-parent</artifactId>
         <version>1.0.0</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
     
     <artifactId>shared-libs</artifactId>

@@ -40,6 +40,15 @@ pipeline {
                 script {
                     echo "Building common shared libraries..."
                     
+                    // Build the parent POM first
+                    if (env.DOCKER_AVAILABLE == 'true') {
+                        sh '${MVN_CMD} clean install -N -DskipTests'
+                        echo "Built parent POM successfully"
+                    } else {
+                        sh 'mvn clean install -N -DskipTests'
+                        echo "Built parent POM successfully"
+                    }
+                    
                     // Build shared-libs parent project first
                     dir('shared-libs') {
                         if (env.DOCKER_AVAILABLE == 'true') {
