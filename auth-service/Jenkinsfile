@@ -8,7 +8,8 @@ pipeline {
         DOCKER_CREDENTIALS_ID = 'docker-registry-credentials'
         PROD_SERVER = 'user@production-server.com'   // Có thể chuyển thành biến môi trường
         PROD_SERVER_CREDENTIALS_ID = 'prod-server-ssh'
-        MVN_CMD = 'docker run --rm -v "$(pwd)/../":/app -v maven-repo:/root/.m2 -w /app maven:3.8.6-eclipse-temurin-17 mvn'
+        // Update the MVN_CMD to properly handle paths
+        MVN_CMD = 'docker run --rm -v "$(pwd)":/app -v maven-repo:/root/.m2 -w /app maven:3.8.6-eclipse-temurin-17 mvn'
     }
     
     stages {
@@ -20,24 +21,32 @@ pipeline {
         
         stage('Build Shared Libraries') {
             steps {
-                // First build common-utils
-                dir('../common-utils') {
-                    sh '${MVN_CMD} clean install -DskipTests'
-                    echo "Built common-utils successfully"
-                }
-                
-                // Then build security-core which may depend on common-utils
-                dir('../security-core') {
-                    sh '${MVN_CMD} clean install -DskipTests'
-                    echo "Built security-core successfully"
+                script {
+                    // First build the parent POM
+                    dir('../shared-libs') {
+                        sh '${MVN_CMD} clean install -N -DskipTests'
+                        echo "Built shared-libs parent POM successfully"
+                        
+                        // Then build common-utils
+                        dir('common-utils') {
+                            sh '${MVN_CMD} clean install -DskipTests'
+                            echo "Built common-utils successfully"
+                        }
+                        
+                        // Then build security-core
+                        dir('security-core') {
+                            sh '${MVN_CMD} clean install -DskipTests'
+                            echo "Built security-core successfully"
+                        }
+                    }
                 }
             }
         }
         
         stage('Build Auth Service') {
             steps {
-                // Now build the auth service with explicit local repo path
-                sh '${MVN_CMD} -f auth-service/pom.xml clean package -DskipTests'
+                // Now build the auth service in the current directory
+                sh '${MVN_CMD} clean package -DskipTests'
                 sh 'docker build -t swiftchat/${SERVICE_NAME}:${BUILD_NUMBER} -t swiftchat/${SERVICE_NAME}:latest .'
             }
             post {
