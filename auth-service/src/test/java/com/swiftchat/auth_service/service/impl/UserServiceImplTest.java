@@ -115,21 +115,34 @@ class UserServiceImplTest {
             when(userRepository.save(any(User.class))).thenReturn(testUser);
             when(roleRepository.findByName(RoleName.ROLE_USER.name())).thenReturn(Optional.of(userRole));
 
-            CompletableFuture<SendResult<String, UserCreatedEvent>> future = new CompletableFuture<>();
+            CompletableFuture<SendResult<String, UserCreatedEvent>> future = CompletableFuture
+                    .completedFuture(mock(SendResult.class));
             when(kafkaTemplate.send(anyString(), any(UserCreatedEvent.class))).thenReturn(future);
             doNothing().when(emailService).sendActivationEmail(anyString(), anyString());
 
-            // Act
-            User createdUser = userService.createUser(createDto);
+            try (MockedStatic<RandomUtil> randomUtilMock = mockStatic(RandomUtil.class)) {
+                randomUtilMock.when(RandomUtil::generateActivationKey).thenReturn(activationKey);
 
-            // Assert
-            assertNotNull(createdUser);
-            assertEquals(testUser.getId(), createdUser.getId());
-            assertEquals(testUser.getEmail(), createdUser.getEmail());
+                // Act
+                User createdUser = userService.createUser(createDto);
 
-            verify(userRepository).save(any(User.class));
-            verify(emailService).sendActivationEmail(anyString(), anyString());
-            verify(kafkaTemplate).send(eq("user-created"), any(UserCreatedEvent.class));
+                // Assert
+                assertNotNull(createdUser);
+                assertEquals(testUser.getId(), createdUser.getId());
+                assertEquals(testUser.getEmail(), createdUser.getEmail());
+
+                // Capture and verify the saved user
+                ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+                verify(userRepository, times(2)).save(userCaptor.capture());
+                User capturedUser = userCaptor.getAllValues().get(0);
+                assertEquals(createDto.getEmail(), capturedUser.getEmail());
+                assertEquals(encodedPassword, capturedUser.getPasswordHash());
+                assertEquals(activationKey, capturedUser.getActivationKey());
+                assertFalse(capturedUser.isActivated());
+
+                verify(emailService).sendActivationEmail(eq(createDto.getEmail()), eq(activationKey));
+                verify(kafkaTemplate).send(eq("user-created"), any(UserCreatedEvent.class));
+            }
         }
 
         @Test
@@ -157,12 +170,24 @@ class UserServiceImplTest {
             when(userRepository.save(any(User.class))).thenReturn(testUser);
             when(roleRepository.findByName(anyString())).thenReturn(Optional.empty()); // Role not found
 
-            // Act
-            User createdUser = userService.createUser(createDto);
+            CompletableFuture<SendResult<String, UserCreatedEvent>> future = CompletableFuture
+                    .completedFuture(mock(SendResult.class));
+            when(kafkaTemplate.send(anyString(), any(UserCreatedEvent.class))).thenReturn(future);
+            doNothing().when(emailService).sendActivationEmail(anyString(), anyString());
 
-            // Assert
-            assertNotNull(createdUser);
-            verify(userRepository).save(any(User.class));
+            try (MockedStatic<RandomUtil> randomUtilMock = mockStatic(RandomUtil.class)) {
+                randomUtilMock.when(RandomUtil::generateActivationKey).thenReturn(activationKey);
+
+                // Act
+                User createdUser = userService.createUser(createDto);
+
+                // Assert
+                assertNotNull(createdUser);
+                verify(userRepository).save(any(User.class));
+                // Even though role assignment failed, user should still be created
+                verify(kafkaTemplate).send(eq("user-created"), any(UserCreatedEvent.class));
+                verify(emailService).sendActivationEmail(anyString(), anyString());
+            }
         }
     }
 

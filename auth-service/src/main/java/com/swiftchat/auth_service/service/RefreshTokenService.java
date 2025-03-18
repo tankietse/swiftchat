@@ -20,7 +20,7 @@ public interface RefreshTokenService {
 
     List<RefreshToken> findAllUserTokens(User user);
 
-    void deleteExpiredTokens();
+    int deleteExpiredTokens();
 
     boolean isTokenValid(String token);
 

@@ -4,11 +4,10 @@ pipeline {
     environment {
         SERVICE_NAME = 'auth-service'
         SERVICE_PORT = '8081'
-        DOCKER_REGISTRY = 'registry.yourcompany.com'  // Replace with your actual Docker registry
-        DOCKER_CREDENTIALS_ID = 'docker-registry-credentials'  // Update to actual credential ID in Jenkins
-        PROD_SERVER = 'user@production-server.com'  // Replace with your production server SSH connection
-        PROD_SERVER_CREDENTIALS_ID = 'prod-server-ssh'  // SSH credentials for production server
-        // Use a volume mount to preserve Maven cache between builds
+        DOCKER_REGISTRY = 'registry.yourcompany.com'  // Có thể chuyển thành biến môi trường
+        DOCKER_CREDENTIALS_ID = 'docker-registry-credentials'
+        PROD_SERVER = 'user@production-server.com'   // Có thể chuyển thành biến môi trường
+        PROD_SERVER_CREDENTIALS_ID = 'prod-server-ssh'
         MVN_CMD = 'docker run --rm -v "$(pwd)":/app -v maven-repo:/root/.m2 -w /app maven:3.8.6-eclipse-temurin-17 mvn'
     }
     
@@ -21,7 +20,6 @@ pipeline {
         
         stage('Build Shared Libraries') {
             steps {
-                // Build shared libraries first
                 dir('../shared-libs') {
                     sh '${MVN_CMD} clean install -DskipTests'
                 }
@@ -30,7 +28,6 @@ pipeline {
         
         stage('Build Auth Service') {
             steps {
-                // Build auth service with dependencies
                 sh '${MVN_CMD} clean package -DskipTests'
                 sh 'docker build -t swiftchat/${SERVICE_NAME}:${BUILD_NUMBER} -t swiftchat/${SERVICE_NAME}:latest .'
             }
@@ -51,17 +48,19 @@ pipeline {
         
         stage('SonarQube Analysis') {
             steps {
-                sh '${MVN_CMD} sonar:sonar -Dsonar.projectKey=swiftchat-auth-service -Dsonar.host.url=${SONAR_HOST_URL}'
+                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                    sh '${MVN_CMD} sonar:sonar -Dsonar.projectKey=swiftchat-auth-service -Dsonar.host.url=${SONAR_HOST_URL} -Dsonar.login=${SONAR_TOKEN}'
+                }
             }
         }
         
         stage('Push Image') {
             when {
-                branch 'main'  // Only push images from main branch
+                branch 'main'
             }
             steps {
-                withCredentials([string(credentialsId: "${DOCKER_CREDENTIALS_ID}", variable: 'DOCKER_PWD')]) {
-                    sh 'echo $DOCKER_PWD | docker login ${DOCKER_REGISTRY} -u username --password-stdin'
+                withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PWD')]) {
+                    sh 'echo $DOCKER_PWD | docker login ${DOCKER_REGISTRY} -u ${DOCKER_USER} --password-stdin'
                     sh 'docker tag swiftchat/${SERVICE_NAME}:latest ${DOCKER_REGISTRY}/swiftchat/${SERVICE_NAME}:latest'
                     sh 'docker push ${DOCKER_REGISTRY}/swiftchat/${SERVICE_NAME}:latest'
                     sh 'docker tag swiftchat/${SERVICE_NAME}:${BUILD_NUMBER} ${DOCKER_REGISTRY}/swiftchat/${SERVICE_NAME}:${BUILD_NUMBER}'
@@ -72,43 +71,60 @@ pipeline {
         
         stage('Deploy to Production') {
             when {
-                branch 'main'  // Only deploy from main branch
+                branch 'main'
             }
             steps {
                 input message: 'Deploy auth-service to production?', ok: 'Deploy'
                 
-                // Copy deployment files to production server
-                sshagent([PROD_SERVER_CREDENTIALS_ID]) {
-                    sh """
-                        ssh ${PROD_SERVER} 'mkdir -p /opt/swiftchat/deployment /opt/swiftchat/config/auth-service'
-                        scp docker-compose.prod.yml ${PROD_SERVER}:/opt/swiftchat/
-                        scp ./src/main/resources/application-prod.properties ${PROD_SERVER}:/opt/swiftchat/config/auth-service/
+                // Inject secrets từ Jenkins credentials
+                withCredentials([
+                    usernamePassword(credentialsId: 'db-credentials', usernameVariable: 'DB_USERNAME', passwordVariable: 'DB_PASSWORD'),
+                    string(credentialsId: 'jwt-secret', variable: 'JWT_SECRET'),
+                    string(credentialsId: 'redis-password', variable: 'REDIS_PASSWORD'),
+                    string(credentialsId: 'ssl-key-store-password', variable: 'SSL_KEY_STORE_PASSWORD'),
+                    usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_REGISTRY_PASSWORD')
+                ]) {
+                    sshagent([PROD_SERVER_CREDENTIALS_ID]) {
+                        // Lưu tag image hiện tại để rollback nếu cần
+                        script {
+                            def previousImage = sh(script: "ssh ${PROD_SERVER} 'docker ps -q -f name=${SERVICE_NAME} | xargs -r docker inspect --format \"{{.Image}}\"'", returnStdout: true).trim()
+                            env.PREVIOUS_IMAGE = previousImage ?: "${DOCKER_REGISTRY}/swiftchat/${SERVICE_NAME}:latest"
+                        }
                         
-                        # Create .env file with secrets
-                        echo 'Creating .env file with necessary secrets'
-                        ssh ${PROD_SERVER} 'cat > /opt/swiftchat/.env << EOL
-DB_USERNAME=postgres
-DB_PASSWORD=\${DB_PROD_PASSWORD}
-JWT_SECRET=\${JWT_PROD_SECRET}
+                        sh """
+                            ssh ${PROD_SERVER} 'mkdir -p /opt/swiftchat/deployment /opt/swiftchat/config/auth-service'
+                            scp docker-compose.prod.yml ${PROD_SERVER}:/opt/swiftchat/
+                            scp ./src/main/resources/application-prod.properties ${PROD_SERVER}:/opt/swiftchat/config/auth-service/
+                            
+                            # Tạo file .env với secrets từ Jenkins credentials
+                            ssh ${PROD_SERVER} 'cat > /opt/swiftchat/.env << EOL
+DB_USERNAME=${DB_USERNAME}
+DB_PASSWORD=${DB_PASSWORD}
+JWT_SECRET=${JWT_SECRET}
 JWT_EXPIRATION=900
 JWT_REFRESH_EXPIRATION=604800
-REDIS_PASSWORD=\${REDIS_PROD_PASSWORD}
-SSL_KEY_STORE_PASSWORD=\${SSL_KEY_STORE_PASSWORD}
+REDIS_PASSWORD=${REDIS_PASSWORD}
+SSL_KEY_STORE_PASSWORD=${SSL_KEY_STORE_PASSWORD}
 EOL'
+                            
+                            # Pull và deploy với timeout
+                            ssh ${PROD_SERVER} 'cd /opt/swiftchat && docker login ${DOCKER_REGISTRY} -u ${DOCKER_USER} -p ${DOCKER_REGISTRY_PASSWORD}'
+                            ssh ${PROD_SERVER} 'cd /opt/swiftchat && timeout 5m docker pull ${DOCKER_REGISTRY}/swiftchat/${SERVICE_NAME}:latest'
+                            ssh ${PROD_SERVER} 'cd /opt/swiftchat && timeout 5m docker-compose -f docker-compose.prod.yml up -d ${SERVICE_NAME}'
+                            
+                            # Chờ service khởi động
+                            ssh ${PROD_SERVER} 'cd /opt/swiftchat && timeout 2m ./scripts/wait-for-service.sh ${SERVICE_NAME} ${SERVICE_PORT}'
+                        """
                         
-                        # Pull latest image and deploy
-                        ssh ${PROD_SERVER} 'cd /opt/swiftchat && docker login ${DOCKER_REGISTRY} -u username -p \${DOCKER_REGISTRY_PASSWORD}'
-                        ssh ${PROD_SERVER} 'cd /opt/swiftchat && docker pull ${DOCKER_REGISTRY}/swiftchat/${SERVICE_NAME}:latest'
-                        ssh ${PROD_SERVER} 'cd /opt/swiftchat && docker-compose -f docker-compose.prod.yml up -d ${SERVICE_NAME}'
-                        
-                        # Wait for service to start
-                        ssh ${PROD_SERVER} 'cd /opt/swiftchat && ./scripts/wait-for-service.sh ${SERVICE_NAME} ${SERVICE_PORT}'
-                    """
-                }
-                
-                // Verify deployment
-                sshagent([PROD_SERVER_CREDENTIALS_ID]) {
-                    sh "ssh ${PROD_SERVER} 'curl -k https://localhost:${SERVICE_PORT}/actuator/health || (echo \"Service health check failed\" && exit 1)'"
+                        // Health check
+                        sh """
+                            ssh ${PROD_SERVER} 'timeout 1m curl -k https://localhost:${SERVICE_PORT}/actuator/health' || (
+                                echo "Health check failed, rolling back to ${env.PREVIOUS_IMAGE}"
+                                ssh ${PROD_SERVER} 'cd /opt/swiftchat && docker-compose -f docker-compose.prod.yml up -d --force-recreate ${SERVICE_NAME} --image ${env.PREVIOUS_IMAGE}'
+                                exit 1
+                            )
+                        """
+                    }
                 }
             }
         }
@@ -116,6 +132,7 @@ EOL'
     
     post {
         always {
+            sh 'docker system prune -f'  // Dọn dẹp Docker sau build
             cleanWs()
         }
         success {

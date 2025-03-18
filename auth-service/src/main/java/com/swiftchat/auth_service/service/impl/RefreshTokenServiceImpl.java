@@ -84,14 +84,16 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Override
     @Transactional
     @Scheduled(fixedRate = 86400000) // Run daily
-    public void deleteExpiredTokens() {
+    public int deleteExpiredTokens() {
         try {
             LocalDateTime now = LocalDateTime.now();
             List<RefreshToken> expiredTokens = refreshTokenRepository.findAllExpiredTokens(now);
             log.info("Found {} expired refresh tokens to delete", expiredTokens.size());
             refreshTokenRepository.deleteAllExpiredTokens(now);
+            return expiredTokens.size();
         } catch (Exception e) {
             log.error("Error while deleting expired tokens", e);
+            return 0;
         }
     }
 

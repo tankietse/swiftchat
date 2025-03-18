@@ -117,14 +117,21 @@ class EmailServiceImplTest {
         // Arrange
         String email = "test@example.com";
         String activationKey = "activation-key-123";
+        
+        when(templateEngine.process(eq("email/activation-email"), any(Context.class)))
+                .thenReturn("<html>Activation Link Content</html>");
 
         // Simulate messaging exception
         doThrow(new MessagingException("Failed to send email"))
                 .when(mailSender).send(any(MimeMessage.class));
 
         // Act & Assert
-        assertThrows(RuntimeException.class,
+        RuntimeException exception = assertThrows(RuntimeException.class,
                 () -> emailService.sendActivationEmail(email, activationKey));
+        
+        // Verify the exception message contains useful information
+        assertTrue(exception.getMessage().contains("Could not send activation email"));
+        assertTrue(exception.getCause() instanceof MessagingException);
     }
 
     @Test
@@ -133,13 +140,20 @@ class EmailServiceImplTest {
         // Arrange
         String email = "test@example.com";
         String resetKey = "reset-key-123";
+        
+        when(templateEngine.process(eq("email/password-reset-email"), any(Context.class)))
+                .thenReturn("<html>Password Reset Link Content</html>");
 
         // Simulate messaging exception
         doThrow(new MessagingException("Failed to send email"))
                 .when(mailSender).send(any(MimeMessage.class));
 
         // Act & Assert
-        assertThrows(RuntimeException.class,
+        RuntimeException exception = assertThrows(RuntimeException.class,
                 () -> emailService.sendPasswordResetEmail(email, resetKey));
+        
+        // Verify the exception message contains useful information
+        assertTrue(exception.getMessage().contains("Could not send password reset email"));
+        assertTrue(exception.getCause() instanceof MessagingException);
     }
 }
