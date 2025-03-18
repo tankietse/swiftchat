@@ -29,7 +29,7 @@ public class CacheConfig {
     /**
      * Cache names with their TTLs
      */
-    private static final Map<String, Duration> CACHE_TTL_MAP = new HashMap<>() {
+    private static final Map<String, Duration> CACHE_TTL_MAP = new HashMap<String, Duration>() {
         {
             put("users", Duration.ofMinutes(30));
             put("roles", Duration.ofMinutes(60));

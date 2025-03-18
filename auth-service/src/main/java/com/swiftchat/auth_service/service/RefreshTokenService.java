@@ -1,7 +1,7 @@
 package com.swiftchat.auth_service.service;
 
 import com.swiftchat.auth_service.model.RefreshToken;
-import com.swiftchat.auth_service.model.User;
+import com.swiftchat.shared.security.model.User;
 
 import java.util.List;
 import java.util.Optional;

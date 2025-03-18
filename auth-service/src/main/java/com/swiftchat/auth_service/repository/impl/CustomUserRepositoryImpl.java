@@ -1,6 +1,6 @@
 package com.swiftchat.auth_service.repository.impl;
 
-import com.swiftchat.auth_service.model.User;
+import com.swiftchat.shared.security.model.User;
 import com.swiftchat.auth_service.repository.CustomUserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;

@@ -1,4 +1,4 @@
-package com.swiftchat.auth_service.model;
+package com.swiftchat.shared.security.model;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -25,5 +25,10 @@ public class Role {
 
     public Role(String name) {
         this.name = name;
+    }
+
+    // Add explicit getter for name to ensure it's available
+    public String getName() {
+        return name;
     }
 }

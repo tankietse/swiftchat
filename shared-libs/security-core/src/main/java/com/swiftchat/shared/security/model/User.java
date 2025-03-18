@@ -1,4 +1,4 @@
-package com.swiftchat.auth_service.model;
+package com.swiftchat.shared.security.model;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -12,7 +12,6 @@ import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Data
 @Builder
@@ -64,9 +63,13 @@ public class User implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return roles.stream()
-                .map(role -> new SimpleGrantedAuthority(role.getName()))
-                .collect(Collectors.toList());
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        for (Role role : roles) {
+            if (role != null && role.getName() != null) {
+                authorities.add(new SimpleGrantedAuthority(role.getName()));
+            }
+        }
+        return authorities;
     }
 
     @Override

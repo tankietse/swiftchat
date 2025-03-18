@@ -5,19 +5,21 @@ import com.swiftchat.auth_service.exception.InvalidCredentialsException;
 import com.swiftchat.auth_service.exception.InvalidTokenException;
 import com.swiftchat.auth_service.exception.ResourceNotFoundException;
 import com.swiftchat.auth_service.exception.UserNotActivatedException;
-import com.swiftchat.auth_service.model.OAuth2Account;
+import com.swiftchat.shared.security.model.OAuth2Account;
 import com.swiftchat.auth_service.model.RefreshToken;
 import com.swiftchat.auth_service.model.RoleName;
-import com.swiftchat.auth_service.model.User;
+import com.swiftchat.shared.security.model.User;
 import com.swiftchat.auth_service.repository.OAuth2AccountRepository;
 import com.swiftchat.auth_service.repository.UserRepository;
-import com.swiftchat.auth_service.security.JwtService;
+import com.swiftchat.shared.security.jwt.JwtService;
 import com.swiftchat.auth_service.service.AuthService;
 import com.swiftchat.auth_service.service.RefreshTokenService;
 import com.swiftchat.auth_service.service.UserService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -36,6 +38,7 @@ import java.util.concurrent.ThreadLocalRandom;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@DependsOn("passwordEncoder")
 public class AuthServiceImpl implements AuthService {
 
     private final UserService userService;

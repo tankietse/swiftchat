@@ -1,4 +1,4 @@
-package com.swiftchat.auth_service.security;
+package com.swiftchat.shared.security.jwt;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

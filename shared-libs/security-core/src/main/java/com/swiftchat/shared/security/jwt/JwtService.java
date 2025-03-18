@@ -1,4 +1,4 @@
-package com.swiftchat.auth_service.security;
+package com.swiftchat.shared.security.jwt;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -67,7 +67,7 @@ public class JwtService {
 
         return Jwts
                 .builder()
-                .claims(extraClaims)
+                .setClaims(extraClaims)
                 .subject(userDetails.getUsername())
                 .issuedAt(new Date())
                 .expiration(Date.from(Instant.now().plus(jwtExpiration, ChronoUnit.SECONDS)))
@@ -82,7 +82,7 @@ public class JwtService {
 
         return Jwts
                 .builder()
-                .claims(extraClaims)
+                .setClaims(extraClaims)
                 .subject(userDetails.getUsername())
                 .issuedAt(new Date())
                 .expiration(Date.from(Instant.now().plus(refreshExpiration, ChronoUnit.SECONDS)))
@@ -115,9 +115,9 @@ public class JwtService {
     private Claims extractAllClaims(String token) {
         return Jwts
                 .parser()
-                .verifyWith(signingKey)
+                .setSigningKey(signingKey)
                 .build()
-                .parseSignedClaims(token)
-                .getPayload();
+                .parseClaimsJws(token)
+                .getBody();
     }
 }

@@ -1,6 +1,6 @@
 package com.swiftchat.auth_service.repository;
 
-import com.swiftchat.auth_service.model.User;
+import com.swiftchat.shared.security.model.User;
 
 import java.time.LocalDateTime;
 import java.util.List;

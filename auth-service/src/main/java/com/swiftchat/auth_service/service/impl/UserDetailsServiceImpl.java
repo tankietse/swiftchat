@@ -1,7 +1,7 @@
 package com.swiftchat.auth_service.service.impl;
 
-import com.swiftchat.auth_service.model.Role;
-import com.swiftchat.auth_service.model.User;
+import com.swiftchat.shared.security.model.Role;
+import com.swiftchat.shared.security.model.User;
 import com.swiftchat.auth_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

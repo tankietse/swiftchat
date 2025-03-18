@@ -1,7 +1,7 @@
 package com.swiftchat.auth_service.repository;
 
-import com.swiftchat.auth_service.model.OAuth2Account;
-import com.swiftchat.auth_service.model.User;
+import com.swiftchat.shared.security.model.OAuth2Account;
+import com.swiftchat.shared.security.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
