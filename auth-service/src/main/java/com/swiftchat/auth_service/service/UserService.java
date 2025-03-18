@@ -3,7 +3,7 @@ package com.swiftchat.auth_service.service;
 import com.swiftchat.auth_service.dto.UserCreateDto;
 import com.swiftchat.auth_service.dto.UserDto;
 import com.swiftchat.auth_service.dto.UserUpdateDto;
-import com.swiftchat.auth_service.model.User;
+import com.swiftchat.shared.security.model.User;
 
 import java.time.LocalDateTime;
 import java.util.List;

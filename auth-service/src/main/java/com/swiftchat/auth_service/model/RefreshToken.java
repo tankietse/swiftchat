@@ -1,5 +1,6 @@
 package com.swiftchat.auth_service.model;
 
+import com.swiftchat.shared.security.model.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

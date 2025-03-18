@@ -1,9 +1,10 @@
 package com.swiftchat.auth_service.repository;
 
-import com.swiftchat.auth_service.model.User;
+import com.swiftchat.shared.security.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -23,12 +24,12 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @Modifying
     @Query("UPDATE User u SET u.activated = true, u.activationKey = null WHERE u.id = :id")
-    void activateUser(UUID id);
+    void activateUser(@Param("id") UUID id);
 
     @Modifying
     @Query("UPDATE User u SET u.lastLoginAt = :loginTime WHERE u.id = :id")
-    void updateLastLogin(UUID id, LocalDateTime loginTime);
+    void updateLastLogin(@Param("id") UUID id, @Param("loginTime") LocalDateTime loginTime);
 
-    @Query(value = "SELECT COUNT(u) > 0 FROM User u JOIN u.roles r WHERE u.id = :userId AND r.name = :roleName")
-    boolean hasRole(UUID userId, String roleName);
+    @Query("SELECT COUNT(u) > 0 FROM User u JOIN u.roles r WHERE u.id = :userId AND r.name = :roleName")
+    boolean hasRole(@Param("userId") UUID userId, @Param("roleName") String roleName);
 }

@@ -4,7 +4,7 @@ import com.swiftchat.auth_service.dto.AuthResponseDto;
 import com.swiftchat.auth_service.dto.LoginRequestDto;
 import com.swiftchat.auth_service.dto.RegisterRequestDto;
 import com.swiftchat.auth_service.dto.TokenRefreshRequestDto;
-import com.swiftchat.auth_service.model.User;
+import com.swiftchat.shared.security.model.User;
 
 import java.util.Map;
 import java.util.UUID;

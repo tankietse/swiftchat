@@ -1,10 +1,11 @@
 package com.swiftchat.auth_service.repository;
 
 import com.swiftchat.auth_service.model.RefreshToken;
-import com.swiftchat.auth_service.model.User;
+import com.swiftchat.shared.security.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -21,20 +22,20 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
 
     @Modifying
     @Query("UPDATE RefreshToken r SET r.revoked = true WHERE r.user.id = :userId")
-    void revokeAllUserTokens(UUID userId);
+    void revokeAllUserTokens(@Param("userId") UUID userId);
 
     @Modifying
     @Query("DELETE FROM RefreshToken r WHERE r.expiryDate < :now")
-    void deleteAllExpiredTokens(LocalDateTime now);
+    void deleteAllExpiredTokens(@Param("now") LocalDateTime now);
 
     @Query("SELECT r FROM RefreshToken r WHERE r.expiryDate < :now AND r.revoked = false")
-    List<RefreshToken> findAllExpiredTokens(LocalDateTime now);
+    List<RefreshToken> findAllExpiredTokens(@Param("now") LocalDateTime now);
 
     boolean existsByToken(String token);
 
     @Modifying
     @Query("DELETE FROM RefreshToken r WHERE r.user = :user")
-    void deleteByUser(User user);
+    void deleteByUser(@Param("user") User user);
 
     long countByUserAndRevokedFalseAndExpiryDateAfter(User user, LocalDateTime now);
 }

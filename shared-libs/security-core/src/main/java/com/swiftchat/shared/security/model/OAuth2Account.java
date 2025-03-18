@@ -1,4 +1,4 @@
-package com.swiftchat.auth_service.model;
+package com.swiftchat.shared.security.model;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

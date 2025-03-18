@@ -6,9 +6,9 @@ import com.swiftchat.auth_service.dto.UserUpdateDto;
 import com.swiftchat.auth_service.event.UserCreatedEvent;
 import com.swiftchat.auth_service.exception.ResourceNotFoundException;
 import com.swiftchat.auth_service.exception.UserAlreadyExistsException;
-import com.swiftchat.auth_service.model.Role;
+import com.swiftchat.shared.security.model.Role;
 import com.swiftchat.auth_service.model.RoleName;
-import com.swiftchat.auth_service.model.User;
+import com.swiftchat.shared.security.model.User;
 import com.swiftchat.auth_service.model.UserRole;
 import com.swiftchat.auth_service.repository.RoleRepository;
 import com.swiftchat.auth_service.repository.UserRepository;
@@ -19,6 +19,8 @@ import com.swiftchat.auth_service.util.RandomUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -32,6 +34,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@DependsOn("passwordEncoder")
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
