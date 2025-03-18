@@ -8,7 +8,8 @@ pipeline {
         DOCKER_CREDENTIALS_ID = 'docker-registry-credentials'  // Update to actual credential ID in Jenkins
         PROD_SERVER = 'user@production-server.com'  // Replace with your production server SSH connection
         PROD_SERVER_CREDENTIALS_ID = 'prod-server-ssh'  // SSH credentials for production server
-        MVN_CMD = 'docker run --rm -v "$(pwd)":/app -w /app maven:3.8.6-eclipse-temurin-17 mvn'
+        // Use a volume mount to preserve Maven cache between builds
+        MVN_CMD = 'docker run --rm -v "$(pwd)":/app -v maven-repo:/root/.m2 -w /app maven:3.8.6-eclipse-temurin-17 mvn'
     }
     
     stages {
@@ -18,9 +19,19 @@ pipeline {
             }
         }
         
-        stage('Build') {
+        stage('Build Shared Libraries') {
             steps {
-                sh '${MVN_CMD} clean package'
+                // Build shared libraries first
+                dir('../shared-libs') {
+                    sh '${MVN_CMD} clean install -DskipTests'
+                }
+            }
+        }
+        
+        stage('Build Auth Service') {
+            steps {
+                // Build auth service with dependencies
+                sh '${MVN_CMD} clean package -DskipTests'
                 sh 'docker build -t swiftchat/${SERVICE_NAME}:${BUILD_NUMBER} -t swiftchat/${SERVICE_NAME}:latest .'
             }
             post {
@@ -38,7 +49,16 @@ pipeline {
             }
         }
         
+        stage('SonarQube Analysis') {
+            steps {
+                sh '${MVN_CMD} sonar:sonar -Dsonar.projectKey=swiftchat-auth-service -Dsonar.host.url=${SONAR_HOST_URL}'
+            }
+        }
+        
         stage('Push Image') {
+            when {
+                branch 'main'  // Only push images from main branch
+            }
             steps {
                 withCredentials([string(credentialsId: "${DOCKER_CREDENTIALS_ID}", variable: 'DOCKER_PWD')]) {
                     sh 'echo $DOCKER_PWD | docker login ${DOCKER_REGISTRY} -u username --password-stdin'
@@ -51,13 +71,16 @@ pipeline {
         }
         
         stage('Deploy to Production') {
+            when {
+                branch 'main'  // Only deploy from main branch
+            }
             steps {
                 input message: 'Deploy auth-service to production?', ok: 'Deploy'
                 
                 // Copy deployment files to production server
                 sshagent([PROD_SERVER_CREDENTIALS_ID]) {
                     sh """
-                        ssh ${PROD_SERVER} 'mkdir -p /opt/swiftchat/deployment'
+                        ssh ${PROD_SERVER} 'mkdir -p /opt/swiftchat/deployment /opt/swiftchat/config/auth-service'
                         scp docker-compose.prod.yml ${PROD_SERVER}:/opt/swiftchat/
                         scp ./src/main/resources/application-prod.properties ${PROD_SERVER}:/opt/swiftchat/config/auth-service/
                         
@@ -97,10 +120,15 @@ EOL'
         }
         success {
             echo 'Auth Service deployed to production successfully!'
+            emailext subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                     body: "Auth Service built and deployed successfully. Check details at: ${env.BUILD_URL}",
+                     to: 'team@swiftchat.com'
         }
         failure {
             echo 'Auth Service deployment failed!'
-            // Add notification steps (email, Slack, etc.)
+            emailext subject: "FAILURE: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                     body: "Auth Service build or deployment failed. Check details at: ${env.BUILD_URL}",
+                     to: 'team@swiftchat.com'
         }
     }
 }
