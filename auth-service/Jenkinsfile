@@ -8,8 +8,8 @@ pipeline {
         DOCKER_CREDENTIALS_ID = 'docker-registry-credentials'
         PROD_SERVER = 'user@production-server.com'   // Có thể chuyển thành biến môi trường
         PROD_SERVER_CREDENTIALS_ID = 'prod-server-ssh'
-        // Update the MVN_CMD to properly handle paths
-        MVN_CMD = 'docker run --rm -v "$(pwd)":/app -v maven-repo:/root/.m2 -w /app maven:3.8.6-eclipse-temurin-17 mvn'
+        // Update the MVN_CMD to use Maven with JDK 21
+        MVN_CMD = 'docker run --rm -v "$(pwd)":/app -v maven-repo:/root/.m2 -w /app maven:3.8.6-eclipse-temurin-21 mvn'
     }
     
     stages {
