@@ -55,10 +55,16 @@ class CustomUserRepositoryImplTest {
     @SuppressWarnings("unchecked")
     private <T> TypedQuery<T> mockTypedQuery(List<T> resultList) {
         TypedQuery<T> query = mock(TypedQuery.class);
+
+        // Only add the most basic behavior needed by all tests
         when(query.getResultList()).thenReturn(resultList);
         when(query.setParameter(anyString(), any())).thenReturn(query);
-        when(query.setMaxResults(anyInt())).thenReturn(query);
-        when(query.getSingleResult()).thenReturn(resultList.isEmpty() ? null : resultList.get(0));
+
+        // For Long query results, we need getSingleResult
+        if (resultList != null && !resultList.isEmpty() && resultList.get(0) instanceof Long) {
+            when(query.getSingleResult()).thenReturn(resultList.get(0));
+        }
+
         return query;
     }
 
@@ -95,7 +101,10 @@ class CustomUserRepositoryImplTest {
         LocalDateTime since = now.minusDays(10);
         int limit = 10;
 
-        TypedQuery<User> mockQuery = mockTypedQuery(expectedUsers);
+        TypedQuery<User> mockQuery = mock(TypedQuery.class);
+        when(mockQuery.getResultList()).thenReturn(expectedUsers);
+        when(mockQuery.setParameter(eq("since"), any())).thenReturn(mockQuery);
+        when(mockQuery.setMaxResults(limit)).thenReturn(mockQuery);
 
         when(entityManager.createQuery(
                 "SELECT u FROM User u WHERE u.createdAt > :since ORDER BY u.createdAt DESC",
@@ -106,6 +115,9 @@ class CustomUserRepositoryImplTest {
 
         // Assert
         assertEquals(expectedUsers, result);
+
+        // Verify setMaxResults was actually called
+        verify(mockQuery).setMaxResults(limit);
     }
 
     @Test
@@ -157,7 +169,10 @@ class CustomUserRepositoryImplTest {
         LocalDateTime since = now.minusDays(1);
         int limit = 10;
 
-        TypedQuery<User> mockQuery = mockTypedQuery(emptyList);
+        TypedQuery<User> mockQuery = mock(TypedQuery.class);
+        when(mockQuery.getResultList()).thenReturn(emptyList);
+        when(mockQuery.setParameter(eq("since"), any())).thenReturn(mockQuery);
+        when(mockQuery.setMaxResults(limit)).thenReturn(mockQuery);
 
         when(entityManager.createQuery(
                 "SELECT u FROM User u WHERE u.createdAt > :since ORDER BY u.createdAt DESC",
@@ -168,6 +183,9 @@ class CustomUserRepositoryImplTest {
 
         // Assert
         assertEquals(emptyList, result);
+
+        // Verify setMaxResults was actually called
+        verify(mockQuery).setMaxResults(limit);
     }
 
     @Test
