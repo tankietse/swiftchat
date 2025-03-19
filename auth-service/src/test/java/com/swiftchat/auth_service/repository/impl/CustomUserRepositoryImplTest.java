@@ -1,5 +1,6 @@
 package com.swiftchat.auth_service.repository.impl;
 
+import com.swiftchat.auth_service.repository.UserRepository;
 import com.swiftchat.shared.security.model.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
@@ -35,8 +36,6 @@ class CustomUserRepositoryImplTest {
     @Mock
     private EntityManager entityManager;
 
-    // Combined interface for mocking that includes both JpaRepository and
-    // JpaSpecificationExecutor
     @Mock
     private UserRepository userRepository;
 
@@ -47,10 +46,6 @@ class CustomUserRepositoryImplTest {
     private User testUser2;
     private LocalDateTime now;
     private List<User> userList;
-
-    // Interface to help with mocking
-    private interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificationExecutor<User> {
-    }
 
     @BeforeEach
     void setUp() {
