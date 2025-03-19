@@ -89,6 +89,13 @@
 			<version>${flyway.version}</version>
 		</dependency>
 		
+		 <!-- Add H2 Database for testing -->
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>test</scope>
+		</dependency>
+		
 		<!-- Messaging Dependencies -->
 		<dependency>
 			<groupId>org.springframework.kafka</groupId>
@@ -183,6 +190,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-thymeleaf</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>runtime</scope>
 		</dependency>
 	</dependencies>
 
