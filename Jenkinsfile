@@ -367,7 +367,6 @@ pipeline {
         stage('Deploy to Dev') {
             when {
                 allOf {
-                    branch 'develop'
                     expression { return params.DEPLOY_MODE == 'all' && env.DOCKER_AVAILABLE == 'true' }
                 }
             }
@@ -381,7 +380,6 @@ pipeline {
         stage('Deploy Auth Service to Dev') {
             when {
                 allOf {
-                    branch 'develop'
                     expression { return params.DEPLOY_MODE == 'all' && env.DOCKER_AVAILABLE == 'true' }
                 }
             }
@@ -418,7 +416,6 @@ pipeline {
         stage('Deploy to Production') {
             when {
                 allOf {
-                    branch 'main'
                     expression { return params.DEPLOY_MODE == 'all' && env.DOCKER_AVAILABLE == 'true' }
                 }
             }
