@@ -83,7 +83,8 @@ pipeline {
         
         stage('Test') {
             steps {
-                sh '${MVN_CMD} test'
+                // Run tests only for the current module to avoid multi-module POM issues
+                sh '${MVN_CMD} -pl . test'
                 junit '**/target/surefire-reports/*.xml'
                 jacoco execPattern: 'target/jacoco.exec'
             }
