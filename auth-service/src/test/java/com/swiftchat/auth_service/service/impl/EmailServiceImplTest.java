@@ -9,7 +9,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.thymeleaf.ITemplateEngine;
 import org.thymeleaf.context.Context;
@@ -49,8 +48,8 @@ class EmailServiceImplTest {
                 ReflectionTestUtils.setField(emailService, "fromEmail", fromEmail);
                 ReflectionTestUtils.setField(emailService, "frontendUrl", frontendUrl);
 
-                // Mock MimeMessage creation
-                when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+                // Only set up mimeMessage creation when it's actually needed in a test
+                // This avoids unnecessary stubbing
         }
 
         @Test
@@ -61,6 +60,8 @@ class EmailServiceImplTest {
                 String activationKey = "activation-key-123";
                 String expectedProcessedTemplate = "<html>Activation Link Content</html>";
 
+                // Set up stubs only needed for this test
+                when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
                 when(templateEngine.process(eq("email/activation-email"), any(Context.class)))
                                 .thenReturn(expectedProcessedTemplate);
 
@@ -90,6 +91,8 @@ class EmailServiceImplTest {
                 String resetKey = "reset-key-123";
                 String expectedProcessedTemplate = "<html>Password Reset Link Content</html>";
 
+                // Set up stubs only needed for this test
+                when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
                 when(templateEngine.process(eq("email/password-reset-email"), any(Context.class)))
                                 .thenReturn(expectedProcessedTemplate);
 
@@ -118,12 +121,12 @@ class EmailServiceImplTest {
                 String email = "test@example.com";
                 String activationKey = "activation-key-123";
 
+                // Set up specific stubs for this test
+                when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
                 when(templateEngine.process(eq("email/activation-email"), any(Context.class)))
                                 .thenReturn("<html>Activation Link Content</html>");
 
                 // Simulate RuntimeException when sending email
-                // Use a RuntimeException since JavaMailSender.send() doesn't declare
-                // MessagingException
                 doThrow(new RuntimeException("Failed to send email"))
                                 .when(mailSender).send(any(MimeMessage.class));
 
@@ -133,7 +136,6 @@ class EmailServiceImplTest {
 
                 // Just verify that we got a RuntimeException, without checking the specific
                 // message
-                // This makes the test more resilient to minor message changes
                 assertNotNull(exception);
         }
 
@@ -144,12 +146,12 @@ class EmailServiceImplTest {
                 String email = "test@example.com";
                 String resetKey = "reset-key-123";
 
+                // Set up specific stubs for this test
+                when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
                 when(templateEngine.process(eq("email/password-reset-email"), any(Context.class)))
                                 .thenReturn("<html>Password Reset Link Content</html>");
 
                 // Simulate RuntimeException when sending email
-                // Use a RuntimeException since JavaMailSender.send() doesn't declare
-                // MessagingException
                 doThrow(new RuntimeException("Failed to send email"))
                                 .when(mailSender).send(any(MimeMessage.class));
 
@@ -159,7 +161,6 @@ class EmailServiceImplTest {
 
                 // Just verify that we got a RuntimeException, without checking the specific
                 // message
-                // This makes the test more resilient to minor message changes
                 assertNotNull(exception);
         }
 }
