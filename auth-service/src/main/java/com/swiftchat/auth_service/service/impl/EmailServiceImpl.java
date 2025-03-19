@@ -8,9 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.ITemplateEngine;
 import org.thymeleaf.context.Context;
 
 @Service
@@ -18,58 +17,66 @@ import org.thymeleaf.context.Context;
 @Slf4j
 public class EmailServiceImpl implements EmailService {
 
-    private final JavaMailSender emailSender;
-    private final TemplateEngine templateEngine;
+    private final JavaMailSender mailSender;
+    private final ITemplateEngine templateEngine;
 
-    @Value("${app.email.from}")
+    @Value("${app.email.from:no-reply@swiftchat.com}")
     private String fromEmail;
 
-    @Value("${app.frontend-url}")
+    @Value("${app.frontend-url:http://localhost:3000}")
     private String frontendUrl;
 
     @Override
-    @Async
     public void sendActivationEmail(String to, String activationKey) {
         try {
-            String activationUrl = frontendUrl + "/activate?key=" + activationKey;
-
+            // Create a context with variables for the template
             Context context = new Context();
-            context.setVariable("activationUrl", activationUrl);
+            context.setVariable("email", to);
+            context.setVariable("activationUrl", frontendUrl + "/auth/activate?key=" + activationKey);
 
-            String htmlContent = templateEngine.process("activation-email", context);
-            sendEmail(to, "SwiftChat Account Activation", htmlContent);
-            log.info("Sent activation email to: {}", to);
-        } catch (Exception e) {
-            log.error("Failed to send activation email to {}: {}", to, e.getMessage());
+            // Process the template
+            String emailContent = templateEngine.process("email/activation-email", context);
+
+            // Create and send the email
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(to);
+            helper.setSubject("Activate your SwiftChat account");
+            helper.setText(emailContent, true);
+
+            mailSender.send(mimeMessage);
+            log.info("Activation email sent to {}", to);
+        } catch (MessagingException e) {
+            log.error("Could not send activation email to {}", to, e);
+            throw new RuntimeException("Could not send activation email: " + e.getMessage(), e);
         }
     }
 
     @Override
-    @Async
     public void sendPasswordResetEmail(String to, String resetKey) {
         try {
-            String resetUrl = frontendUrl + "/auth/reset-password?token=" + resetKey;
-
+            // Create a context with variables for the template
             Context context = new Context();
-            context.setVariable("resetUrl", resetUrl);
+            context.setVariable("email", to);
+            context.setVariable("resetUrl", frontendUrl + "/auth/reset-password?key=" + resetKey);
 
-            String htmlContent = templateEngine.process("password-reset-email", context);
-            sendEmail(to, "SwiftChat Password Reset", htmlContent);
-            log.info("Sent password reset email to: {}", to);
-        } catch (Exception e) {
-            log.error("Failed to send password reset email to {}: {}", to, e.getMessage());
+            // Process the template
+            String emailContent = templateEngine.process("email/password-reset-email", context);
+
+            // Create and send the email
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(to);
+            helper.setSubject("Reset your SwiftChat password");
+            helper.setText(emailContent, true);
+
+            mailSender.send(mimeMessage);
+            log.info("Password reset email sent to {}", to);
+        } catch (MessagingException e) {
+            log.error("Could not send password reset email to {}", to, e);
+            throw new RuntimeException("Could not send password reset email: " + e.getMessage(), e);
         }
-    }
-
-    private void sendEmail(String to, String subject, String htmlContent) throws MessagingException {
-        MimeMessage message = emailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-        helper.setFrom(fromEmail);
-        helper.setTo(to);
-        helper.setSubject(subject);
-        helper.setText(htmlContent, true);
-
-        emailSender.send(message);
     }
 }
