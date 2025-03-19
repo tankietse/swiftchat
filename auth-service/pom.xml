@@ -28,6 +28,7 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<flyway.version>11.4.0</flyway.version>
 	</properties>
 	<dependencies>
 		 <!-- SwiftChat Shared Libraries -->
@@ -85,6 +86,7 @@
 		<dependency>
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-database-postgresql</artifactId>
+			<version>${flyway.version}</version>
 		</dependency>
 		
 		<!-- Messaging Dependencies -->
@@ -197,7 +199,7 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
-				<version>${spring-boot.version}</version>
+				<version>3.2.3</version>
 				<configuration>
 					<excludes>
 						<exclude>
