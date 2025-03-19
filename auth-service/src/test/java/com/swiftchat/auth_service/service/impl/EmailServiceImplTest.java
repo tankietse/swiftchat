@@ -62,7 +62,7 @@ class EmailServiceImplTest {
 
                 // Set up stubs only needed for this test
                 when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
-                when(templateEngine.process(eq("email/activation-email"), any(Context.class)))
+                when(templateEngine.process(eq("activation-email"), any(Context.class)))
                                 .thenReturn(expectedProcessedTemplate);
 
                 // Act
@@ -71,7 +71,7 @@ class EmailServiceImplTest {
                 // Assert
                 // Verify template engine is called with correct template name
                 ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
-                verify(templateEngine).process(eq("email/activation-email"), contextCaptor.capture());
+                verify(templateEngine).process(eq("activation-email"), contextCaptor.capture());
 
                 // Verify context variables
                 Context capturedContext = contextCaptor.getValue();
@@ -93,7 +93,7 @@ class EmailServiceImplTest {
 
                 // Set up stubs only needed for this test
                 when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
-                when(templateEngine.process(eq("email/password-reset-email"), any(Context.class)))
+                when(templateEngine.process(eq("password-reset-email"), any(Context.class)))
                                 .thenReturn(expectedProcessedTemplate);
 
                 // Act
@@ -102,7 +102,7 @@ class EmailServiceImplTest {
                 // Assert
                 // Verify template engine is called with correct template name
                 ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
-                verify(templateEngine).process(eq("email/password-reset-email"), contextCaptor.capture());
+                verify(templateEngine).process(eq("password-reset-email"), contextCaptor.capture());
 
                 // Verify context variables
                 Context capturedContext = contextCaptor.getValue();
@@ -123,7 +123,7 @@ class EmailServiceImplTest {
 
                 // Set up specific stubs for this test
                 when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
-                when(templateEngine.process(eq("email/activation-email"), any(Context.class)))
+                when(templateEngine.process(eq("activation-email"), any(Context.class)))
                                 .thenReturn("<html>Activation Link Content</html>");
 
                 // Simulate RuntimeException when sending email
@@ -148,7 +148,7 @@ class EmailServiceImplTest {
 
                 // Set up specific stubs for this test
                 when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
-                when(templateEngine.process(eq("email/password-reset-email"), any(Context.class)))
+                when(templateEngine.process(eq("password-reset-email"), any(Context.class)))
                                 .thenReturn("<html>Password Reset Link Content</html>");
 
                 // Simulate RuntimeException when sending email
