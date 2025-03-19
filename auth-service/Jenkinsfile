@@ -10,6 +10,9 @@ pipeline {
         PROD_SERVER_CREDENTIALS_ID = 'prod-server-ssh'
         // Update the MVN_CMD to use Maven with JDK 21
         MVN_CMD = 'docker run --rm -v "$(pwd)":/app -v maven-repo:/root/.m2 -w /app maven:3.8.6-eclipse-temurin-21 mvn'
+        // Add database credentials environment variables
+        DB_CREDENTIALS_ID = 'neon-db-credentials'
+        MAIL_CREDENTIALS_ID = 'mail-credentials'
     }
     
     stages {
@@ -53,9 +56,23 @@ pipeline {
         
         stage('Build Auth Service') {
             steps {
-                // Now build the auth service in the current directory
-                sh '${MVN_CMD} clean package -DskipTests'
-                sh 'docker build -t swiftchat/${SERVICE_NAME}:${BUILD_NUMBER} -t swiftchat/${SERVICE_NAME}:latest .'
+                // Inject database credentials for build
+                withCredentials([
+                    usernamePassword(credentialsId: "${DB_CREDENTIALS_ID}", usernameVariable: 'DB_USERNAME', passwordVariable: 'DB_PASSWORD'),
+                    string(credentialsId: 'jwt-secret', variable: 'JWT_SECRET'),
+                    usernamePassword(credentialsId: "${MAIL_CREDENTIALS_ID}", usernameVariable: 'MAIL_USERNAME', passwordVariable: 'MAIL_PASSWORD')
+                ]) {
+                    // Now build the auth service in the current directory with credentials
+                    sh """
+                        ${MVN_CMD} clean package -DskipTests \
+                        -Dspring.datasource.username=${DB_USERNAME} \
+                        -Dspring.datasource.password=${DB_PASSWORD} \
+                        -Djwt.secret=${JWT_SECRET} \
+                        -Dspring.mail.username=${MAIL_USERNAME} \
+                        -Dspring.mail.password=${MAIL_PASSWORD}
+                    """
+                    sh 'docker build -t swiftchat/${SERVICE_NAME}:${BUILD_NUMBER} -t swiftchat/${SERVICE_NAME}:latest .'
+                }
             }
             post {
                 success {
@@ -104,11 +121,12 @@ pipeline {
                 
                 // Inject secrets từ Jenkins credentials
                 withCredentials([
-                    usernamePassword(credentialsId: 'db-credentials', usernameVariable: 'DB_USERNAME', passwordVariable: 'DB_PASSWORD'),
+                    usernamePassword(credentialsId: "${DB_CREDENTIALS_ID}", usernameVariable: 'DB_USERNAME', passwordVariable: 'DB_PASSWORD'),
                     string(credentialsId: 'jwt-secret', variable: 'JWT_SECRET'),
                     string(credentialsId: 'redis-password', variable: 'REDIS_PASSWORD'),
                     string(credentialsId: 'ssl-key-store-password', variable: 'SSL_KEY_STORE_PASSWORD'),
-                    usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_REGISTRY_PASSWORD')
+                    usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_REGISTRY_PASSWORD'),
+                    usernamePassword(credentialsId: "${MAIL_CREDENTIALS_ID}", usernameVariable: 'MAIL_USERNAME', passwordVariable: 'MAIL_PASSWORD')
                 ]) {
                     sshagent([PROD_SERVER_CREDENTIALS_ID]) {
                         // Lưu tag image hiện tại để rollback nếu cần
@@ -124,13 +142,23 @@ pipeline {
                             
                             # Tạo file .env với secrets từ Jenkins credentials
                             ssh ${PROD_SERVER} 'cat > /opt/swiftchat/.env << EOL
+DB_HOST=ep-steep-silence-a1ko30sa.ap-southeast-1.aws.neon.tech
+DB_NAME=authdb
 DB_USERNAME=${DB_USERNAME}
 DB_PASSWORD=${DB_PASSWORD}
 JWT_SECRET=${JWT_SECRET}
 JWT_EXPIRATION=900
 JWT_REFRESH_EXPIRATION=604800
+REDIS_HOST=redis
+REDIS_PORT=6379
 REDIS_PASSWORD=${REDIS_PASSWORD}
 SSL_KEY_STORE_PASSWORD=${SSL_KEY_STORE_PASSWORD}
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=${MAIL_USERNAME}
+MAIL_PASSWORD=${MAIL_PASSWORD}
+APP_EMAIL_FROM=no-reply@swiftchat.com
+APP_FRONTEND_URL=https://swiftchat.com
 EOL'
                             
                             # Pull và deploy với timeout

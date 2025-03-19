@@ -34,8 +34,8 @@ public class EmailServiceImpl implements EmailService {
             context.setVariable("email", to);
             context.setVariable("activationUrl", frontendUrl + "/auth/activate?key=" + activationKey);
 
-            // Process the template
-            String emailContent = templateEngine.process("email/activation-email", context);
+            // Update the template path - remove 'email/' prefix
+            String emailContent = templateEngine.process("activation-email", context);
 
             // Create and send the email
             MimeMessage mimeMessage = mailSender.createMimeMessage();
@@ -61,8 +61,8 @@ public class EmailServiceImpl implements EmailService {
             context.setVariable("email", to);
             context.setVariable("resetUrl", frontendUrl + "/auth/reset-password?key=" + resetKey);
 
-            // Process the template
-            String emailContent = templateEngine.process("email/password-reset-email", context);
+            // Update the template path - remove 'email/' prefix
+            String emailContent = templateEngine.process("password-reset-email", context);
 
             // Create and send the email
             MimeMessage mimeMessage = mailSender.createMimeMessage();
