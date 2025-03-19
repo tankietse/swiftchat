@@ -83,8 +83,8 @@ pipeline {
         
         stage('Test') {
             steps {
-                // Run tests only for the current module to avoid multi-module POM issues
-                sh '${MVN_CMD} -pl . test'
+                // Run tests for the auth-service module without forking to avoid PluginClassLoader issues
+                sh "${MVN_CMD} -pl . test -DforkCount=0"
                 junit '**/target/surefire-reports/*.xml'
                 jacoco execPattern: 'target/jacoco.exec'
             }
