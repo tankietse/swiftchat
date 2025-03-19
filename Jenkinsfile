@@ -245,9 +245,9 @@ pipeline {
             steps {
                 script {
                     if (env.DOCKER_AVAILABLE == 'true') {
-                        sh '${MVN_CMD} test'
+                        sh '${MVN_CMD} -N test'
                     } else {
-                        sh 'mvn test'
+                        sh 'mvn -N test'
                     }
                 }
             }
