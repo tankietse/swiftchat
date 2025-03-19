@@ -10,16 +10,23 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Custom User Repository Implementation Tests")
@@ -28,12 +35,22 @@ class CustomUserRepositoryImplTest {
     @Mock
     private EntityManager entityManager;
 
+    // Combined interface for mocking that includes both JpaRepository and
+    // JpaSpecificationExecutor
+    @Mock
+    private UserRepository userRepository;
+
     @InjectMocks
     private CustomUserRepositoryImpl customUserRepository;
 
     private User testUser1;
     private User testUser2;
     private LocalDateTime now;
+    private List<User> userList;
+
+    // Interface to help with mocking
+    private interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificationExecutor<User> {
+    }
 
     @SuppressWarnings("unchecked")
     private <T> TypedQuery<T> mockTypedQuery(List<T> resultList) {
@@ -66,6 +83,8 @@ class CustomUserRepositoryImplTest {
                 .createdAt(now.minusDays(10))
                 .lastLoginAt(now.minusDays(3))
                 .build();
+
+        userList = Arrays.asList(testUser1, testUser2);
     }
 
     @Test
@@ -190,5 +209,131 @@ class CustomUserRepositoryImplTest {
 
         // Assert
         assertEquals(expectedCount, result);
+    }
+
+    @Test
+    @DisplayName("Should find users by username or email containing search term")
+    void findByUsernameOrEmailContaining_ShouldReturnMatchingUsers() {
+        // Arrange
+        String searchTerm = "test";
+        PageRequest pageable = PageRequest.of(0, 10);
+        Page<User> expectedPage = new PageImpl<>(userList, pageable, userList.size());
+
+        // Only set up stubs needed for this test
+        when(userRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(expectedPage);
+
+        // Act
+        Page<User> result = customUserRepository.findByUsernameOrEmailContaining(searchTerm, pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(2, result.getContent().size());
+        assertEquals(testUser1, result.getContent().get(0));
+        assertEquals(testUser2, result.getContent().get(1));
+
+        // Verify interactions
+        verify(userRepository).findAll(any(Specification.class), eq(pageable));
+    }
+
+    @Test
+    @DisplayName("Should find users by username containing search term")
+    void findByUsernameContaining_ShouldReturnMatchingUsers() {
+        // Arrange
+        String searchTerm = "user";
+        PageRequest pageable = PageRequest.of(0, 10);
+        Page<User> expectedPage = new PageImpl<>(userList, pageable, userList.size());
+
+        // Only set up stubs needed for this test
+        when(userRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(expectedPage);
+
+        // Act
+        Page<User> result = customUserRepository.findByUsernameContaining(searchTerm, pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(2, result.getContent().size());
+        assertEquals(testUser1, result.getContent().get(0));
+        assertEquals(testUser2, result.getContent().get(1));
+
+        // Verify interactions
+        verify(userRepository).findAll(any(Specification.class), eq(pageable));
+    }
+
+    @Test
+    @DisplayName("Should find user by exact email")
+    void findByExactEmail_ShouldReturnUser() {
+        // Arrange
+        String email = "test1@example.com";
+
+        // Use the findOne method from JpaSpecificationExecutor
+        when(userRepository.findOne(any(Specification.class))).thenReturn(Optional.of(testUser1));
+
+        // Act
+        Optional<User> result = customUserRepository.findByExactEmail(email);
+
+        // Assert
+        assertTrue(result.isPresent());
+        assertEquals(testUser1, result.get());
+
+        // Verify interactions
+        verify(userRepository).findOne(any(Specification.class));
+    }
+
+    @Test
+    @DisplayName("Should return empty when user not found by exact email")
+    void findByExactEmail_WhenUserNotFound_ShouldReturnEmpty() {
+        // Arrange
+        String email = "nonexistent@example.com";
+
+        // Only set up stubs needed for this test
+        when(userRepository.findOne(any(Specification.class))).thenReturn(Optional.empty());
+
+        // Act
+        Optional<User> result = customUserRepository.findByExactEmail(email);
+
+        // Assert
+        assertFalse(result.isPresent());
+
+        // Verify interactions
+        verify(userRepository).findOne(any(Specification.class));
+    }
+
+    @Test
+    @DisplayName("Should find user by exact username")
+    void findByExactUsername_ShouldReturnUser() {
+        // Arrange
+        String username = "testuser1";
+
+        // Use the findOne method from JpaSpecificationExecutor
+        when(userRepository.findOne(any(Specification.class))).thenReturn(Optional.of(testUser1));
+
+        // Act
+        Optional<User> result = customUserRepository.findByExactUsername(username);
+
+        // Assert
+        assertTrue(result.isPresent());
+        assertEquals(testUser1, result.get());
+
+        // Verify interactions
+        verify(userRepository).findOne(any(Specification.class));
+    }
+
+    @Test
+    @DisplayName("Should return empty when user not found by exact username")
+    void findByExactUsername_WhenUserNotFound_ShouldReturnEmpty() {
+        // Arrange
+        String username = "nonexistent";
+
+        // Only set up stubs needed for this test
+        when(userRepository.findOne(any(Specification.class))).thenReturn(Optional.empty());
+
+        // Act
+        Optional<User> result = customUserRepository.findByExactUsername(username);
+
+        // Assert
+        assertFalse(result.isPresent());
+
+        // Verify interactions
+        verify(userRepository).findOne(any(Specification.class));
     }
 }
