@@ -25,6 +25,8 @@ pipeline {
                     // First build the root parent POM
                     dir('..') {
                         sh '${MVN_CMD} clean install -N -DskipTests'
+                        // Add explicit update to download all dependencies
+                        sh '${MVN_CMD} dependency:resolve -U'
                         echo "Built parent POM successfully"
                     }
                     
