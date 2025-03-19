@@ -1,6 +1,20 @@
 pipeline {
     agent any
     
+    parameters {
+        booleanParam(name: 'BUILD_API_GATEWAY', defaultValue: true, description: 'Build API Gateway')
+        booleanParam(name: 'BUILD_SERVICE_REGISTRY', defaultValue: true, description: 'Build Service Registry')
+        booleanParam(name: 'BUILD_AUTH_SERVICE', defaultValue: true, description: 'Build Auth Service')
+        booleanParam(name: 'BUILD_USER_SERVICE', defaultValue: true, description: 'Build User Service')
+        booleanParam(name: 'BUILD_CHAT_SERVICE', defaultValue: true, description: 'Build Chat Service')
+        booleanParam(name: 'BUILD_NOTIFICATION_SERVICE', defaultValue: true, description: 'Build Notification Service')
+        booleanParam(name: 'BUILD_FILE_SERVICE', defaultValue: true, description: 'Build File Service')
+        
+        choice(name: 'DEPLOY_MODE', choices: ['none', 'individual', 'all'], description: 'Deployment mode')
+        choice(name: 'DEPLOY_SERVICE', choices: ['api-gateway', 'service-registry', 'auth-service', 'user-service', 'chat-service', 'notification-service', 'file-service'], description: 'Select service to deploy when using individual mode')
+        choice(name: 'DEPLOY_ENV', choices: ['dev', 'prod'], description: 'Deployment environment')
+    }
+    
     environment {
         DOCKER_REGISTRY = 'your-registry-url'
         DOCKER_CREDENTIALS_ID = 'docker-cred-id'
@@ -90,6 +104,9 @@ pipeline {
         stage('Build Microservices') {
             parallel {
                 stage('Build API Gateway') {
+                    when {
+                        expression { return params.BUILD_API_GATEWAY }
+                    }
                     steps {
                         dir('api-gateway') {
                             script {
@@ -105,6 +122,9 @@ pipeline {
                 }
                 
                 stage('Build Service Registry') {
+                    when {
+                        expression { return params.BUILD_SERVICE_REGISTRY }
+                    }
                     steps {
                         dir('service-registry') {
                             script {
@@ -120,6 +140,9 @@ pipeline {
                 }
                 
                 stage('Build Auth Service') {
+                    when {
+                        expression { return params.BUILD_AUTH_SERVICE }
+                    }
                     steps {
                         dir('auth-service') {
                             script {
@@ -145,6 +168,9 @@ pipeline {
                 }
                 
                 stage('Build User Service') {
+                    when {
+                        expression { return params.BUILD_USER_SERVICE }
+                    }
                     steps {
                         dir('user-service') {
                             script {
@@ -160,6 +186,9 @@ pipeline {
                 }
                 
                 stage('Build Chat Service') {
+                    when {
+                        expression { return params.BUILD_CHAT_SERVICE }
+                    }
                     steps {
                         dir('chat-service') {
                             script {
@@ -175,6 +204,9 @@ pipeline {
                 }
                 
                 stage('Build Notification Service') {
+                    when {
+                        expression { return params.BUILD_NOTIFICATION_SERVICE }
+                    }
                     steps {
                         dir('notification-service') {
                             script {
@@ -190,6 +222,9 @@ pipeline {
                 }
                 
                 stage('Build File Service') {
+                    when {
+                        expression { return params.BUILD_FILE_SERVICE }
+                    }
                     steps {
                         dir('file-service') {
                             script {
@@ -219,6 +254,9 @@ pipeline {
         }
         
         stage('Test Auth Service') {
+            when {
+                expression { return params.BUILD_AUTH_SERVICE }
+            }
             steps {
                 dir('auth-service') {
                     script {
@@ -236,37 +274,91 @@ pipeline {
         
         stage('Push Images') {
             when {
-                branch 'main'
+                allOf {
+                    branch 'main'
+                    expression { return env.DOCKER_AVAILABLE == 'true' }
+                }
             }
             steps {
                 script {
-                    if (env.DOCKER_AVAILABLE == 'true') {
-                        withCredentials([string(credentialsId: "${DOCKER_CREDENTIALS_ID}", variable: 'DOCKER_PWD')]) {
-                            sh 'echo $DOCKER_PWD | docker login ${DOCKER_REGISTRY} -u username --password-stdin'
-                            
+                    withCredentials([string(credentialsId: "${DOCKER_CREDENTIALS_ID}", variable: 'DOCKER_PWD')]) {
+                        sh 'echo $DOCKER_PWD | docker login ${DOCKER_REGISTRY} -u username --password-stdin'
+                        
+                        if (params.BUILD_API_GATEWAY) {
                             sh 'docker tag swiftchat/api-gateway:latest ${DOCKER_REGISTRY}/swiftchat/api-gateway:latest'
                             sh 'docker push ${DOCKER_REGISTRY}/swiftchat/api-gateway:latest'
-                            
+                        }
+                        
+                        if (params.BUILD_SERVICE_REGISTRY) {
                             sh 'docker tag swiftchat/service-registry:latest ${DOCKER_REGISTRY}/swiftchat/service-registry:latest'
                             sh 'docker push ${DOCKER_REGISTRY}/swiftchat/service-registry:latest'
-                            
+                        }
+                        
+                        if (params.BUILD_AUTH_SERVICE) {
                             sh 'docker tag swiftchat/auth-service:latest ${DOCKER_REGISTRY}/swiftchat/auth-service:latest'
                             sh 'docker push ${DOCKER_REGISTRY}/swiftchat/auth-service:latest'
-                            
+                        }
+                        
+                        if (params.BUILD_USER_SERVICE) {
                             sh 'docker tag swiftchat/user-service:latest ${DOCKER_REGISTRY}/swiftchat/user-service:latest'
                             sh 'docker push ${DOCKER_REGISTRY}/swiftchat/user-service:latest'
-                            
+                        }
+                        
+                        if (params.BUILD_CHAT_SERVICE) {
                             sh 'docker tag swiftchat/chat-service:latest ${DOCKER_REGISTRY}/swiftchat/chat-service:latest'
                             sh 'docker push ${DOCKER_REGISTRY}/swiftchat/chat-service:latest'
-                            
+                        }
+                        
+                        if (params.BUILD_NOTIFICATION_SERVICE) {
                             sh 'docker tag swiftchat/notification-service:latest ${DOCKER_REGISTRY}/swiftchat/notification-service:latest'
                             sh 'docker push ${DOCKER_REGISTRY}/swiftchat/notification-service:latest'
-                            
+                        }
+                        
+                        if (params.BUILD_FILE_SERVICE) {
                             sh 'docker tag swiftchat/file-service:latest ${DOCKER_REGISTRY}/swiftchat/file-service:latest'
                             sh 'docker push ${DOCKER_REGISTRY}/swiftchat/file-service:latest'
                         }
-                    } else {
-                        echo "Docker is not available, skipping image push"
+                    }
+                }
+            }
+        }
+        
+        // Individual Service Deployment Stages
+        stage('Deploy Individual Service') {
+            when {
+                expression { 
+                    return params.DEPLOY_MODE == 'individual' && env.DOCKER_AVAILABLE == 'true' 
+                }
+            }
+            steps {
+                script {
+                    def composeFile = params.DEPLOY_ENV == 'prod' ? 'docker-compose.prod.yml' : 'docker-compose.dev.yml'
+                    def service = params.DEPLOY_SERVICE
+                    
+                    echo "Deploying individual service: ${service} to ${params.DEPLOY_ENV} environment"
+                    sh "docker-compose -f ${composeFile} up -d ${service}"
+                    
+                    // For essential services like Service Registry and API Gateway
+                    if (service == 'service-registry' || service == 'api-gateway') {
+                        sh """
+                            # Wait for ${service} to be healthy
+                            max_attempts=12
+                            counter=0
+                            echo "Waiting for ${service} to become available..."
+                            until curl -s http://localhost:\$(docker-compose -f ${composeFile} port ${service} 8080 | cut -d':' -f2)/actuator/health | grep -q "UP" || [ \$counter -eq \$max_attempts ]
+                            do
+                              sleep 5
+                              counter=\$((counter + 1))
+                              echo "Attempt \$counter of \$max_attempts"
+                            done
+                            
+                            if [ \$counter -eq \$max_attempts ]; then
+                              echo "Failed to start ${service}"
+                              exit 1
+                            else
+                              echo "${service} started successfully"
+                            fi
+                        """
                     }
                 }
             }
@@ -274,22 +366,24 @@ pipeline {
         
         stage('Deploy to Dev') {
             when {
-                branch 'develop'
+                allOf {
+                    branch 'develop'
+                    expression { return params.DEPLOY_MODE == 'all' && env.DOCKER_AVAILABLE == 'true' }
+                }
             }
             steps {
                 script {
-                    if (env.DOCKER_AVAILABLE == 'true') {
-                        sh 'docker-compose -f docker-compose.dev.yml up -d'
-                    } else {
-                        echo "Docker is not available, skipping deployment"
-                    }
+                    sh 'docker-compose -f docker-compose.dev.yml up -d'
                 }
             }
         }
         
         stage('Deploy Auth Service to Dev') {
             when {
-                branch 'develop'
+                allOf {
+                    branch 'develop'
+                    expression { return params.DEPLOY_MODE == 'all' && env.DOCKER_AVAILABLE == 'true' }
+                }
             }
             steps {
                 script {
@@ -323,7 +417,10 @@ pipeline {
         
         stage('Deploy to Production') {
             when {
-                branch 'main'
+                allOf {
+                    branch 'main'
+                    expression { return params.DEPLOY_MODE == 'all' && env.DOCKER_AVAILABLE == 'true' }
+                }
             }
             steps {
                 input message: 'Approve deployment to production?'
