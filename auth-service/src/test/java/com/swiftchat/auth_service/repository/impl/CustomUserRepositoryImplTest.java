@@ -52,22 +52,6 @@ class CustomUserRepositoryImplTest {
     private interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificationExecutor<User> {
     }
 
-    @SuppressWarnings("unchecked")
-    private <T> TypedQuery<T> mockTypedQuery(List<T> resultList) {
-        TypedQuery<T> query = mock(TypedQuery.class);
-
-        // Only add the most basic behavior needed by all tests
-        when(query.getResultList()).thenReturn(resultList);
-        when(query.setParameter(anyString(), any())).thenReturn(query);
-
-        // For Long query results, we need getSingleResult
-        if (resultList != null && !resultList.isEmpty() && resultList.get(0) instanceof Long) {
-            when(query.getSingleResult()).thenReturn(resultList.get(0));
-        }
-
-        return query;
-    }
-
     @BeforeEach
     void setUp() {
         now = LocalDateTime.now();
@@ -101,6 +85,7 @@ class CustomUserRepositoryImplTest {
         LocalDateTime since = now.minusDays(10);
         int limit = 10;
 
+        @SuppressWarnings("unchecked")
         TypedQuery<User> mockQuery = mock(TypedQuery.class);
         when(mockQuery.getResultList()).thenReturn(expectedUsers);
         when(mockQuery.setParameter(eq("since"), any())).thenReturn(mockQuery);
@@ -127,7 +112,10 @@ class CustomUserRepositoryImplTest {
         List<User> expectedUsers = Arrays.asList(testUser2);
         LocalDateTime lastActiveDate = now.minusDays(2);
 
-        TypedQuery<User> mockQuery = mockTypedQuery(expectedUsers);
+        @SuppressWarnings("unchecked")
+        TypedQuery<User> mockQuery = mock(TypedQuery.class);
+        when(mockQuery.getResultList()).thenReturn(expectedUsers);
+        when(mockQuery.setParameter(eq("lastActiveDate"), any())).thenReturn(mockQuery);
 
         when(entityManager.createQuery(
                 "SELECT u FROM User u WHERE u.lastLoginAt < :lastActiveDate OR u.lastLoginAt IS NULL",
@@ -148,7 +136,11 @@ class CustomUserRepositoryImplTest {
         LocalDateTime startDate = now.minusDays(7);
         LocalDateTime endDate = now;
 
-        TypedQuery<Long> mockQuery = mockTypedQuery(Arrays.asList(expectedCount));
+        @SuppressWarnings("unchecked")
+        TypedQuery<Long> mockQuery = mock(TypedQuery.class);
+        when(mockQuery.getSingleResult()).thenReturn(expectedCount);
+        when(mockQuery.setParameter(eq("startDate"), any())).thenReturn(mockQuery);
+        when(mockQuery.setParameter(eq("endDate"), any())).thenReturn(mockQuery);
 
         when(entityManager.createQuery(
                 "SELECT COUNT(u) FROM User u WHERE u.lastLoginAt BETWEEN :startDate AND :endDate",
@@ -169,6 +161,7 @@ class CustomUserRepositoryImplTest {
         LocalDateTime since = now.minusDays(1);
         int limit = 10;
 
+        @SuppressWarnings("unchecked")
         TypedQuery<User> mockQuery = mock(TypedQuery.class);
         when(mockQuery.getResultList()).thenReturn(emptyList);
         when(mockQuery.setParameter(eq("since"), any())).thenReturn(mockQuery);
@@ -195,7 +188,10 @@ class CustomUserRepositoryImplTest {
         List<User> emptyList = List.of();
         LocalDateTime lastActiveDate = now.minusDays(30);
 
-        TypedQuery<User> mockQuery = mockTypedQuery(emptyList);
+        @SuppressWarnings("unchecked")
+        TypedQuery<User> mockQuery = mock(TypedQuery.class);
+        when(mockQuery.getResultList()).thenReturn(emptyList);
+        when(mockQuery.setParameter(eq("lastActiveDate"), any())).thenReturn(mockQuery);
 
         when(entityManager.createQuery(
                 "SELECT u FROM User u WHERE u.lastLoginAt < :lastActiveDate OR u.lastLoginAt IS NULL",
@@ -216,7 +212,11 @@ class CustomUserRepositoryImplTest {
         LocalDateTime startDate = now.minusYears(2);
         LocalDateTime endDate = now.minusYears(1);
 
-        TypedQuery<Long> mockQuery = mockTypedQuery(Arrays.asList(expectedCount));
+        @SuppressWarnings("unchecked")
+        TypedQuery<Long> mockQuery = mock(TypedQuery.class);
+        when(mockQuery.getSingleResult()).thenReturn(expectedCount);
+        when(mockQuery.setParameter(eq("startDate"), any())).thenReturn(mockQuery);
+        when(mockQuery.setParameter(eq("endDate"), any())).thenReturn(mockQuery);
 
         when(entityManager.createQuery(
                 "SELECT COUNT(u) FROM User u WHERE u.lastLoginAt BETWEEN :startDate AND :endDate",
