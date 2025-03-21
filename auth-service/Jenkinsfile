@@ -91,9 +91,10 @@ pipeline {
                         // Process test results in a separate step to isolate potential issues
                         junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
                         
-                        // Run coverage report in a separate step
+                        // Replace deprecated jacoco with publishCoverage
                         echo "Generating coverage report"
-                        jacoco execPattern: 'target/jacoco.exec'
+                        publishCoverage adapters: [jacocoAdapter('target/jacoco.exec')],
+                            sourceFileResolver: sourceFiles('STORE_ALL_BUILD')
                     } catch (Exception e) {
                         echo "Warning: Test execution had issues: ${e.message}"
                         currentBuild.result = 'UNSTABLE'

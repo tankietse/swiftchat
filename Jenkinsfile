@@ -267,7 +267,9 @@ pipeline {
                         }
                     }
                     junit '**/target/surefire-reports/*.xml'
-                    jacoco execPattern: 'target/jacoco.exec'
+                    // Replace deprecated jacoco with publishCoverage
+                    publishCoverage adapters: [jacocoAdapter('target/jacoco.exec')],
+                        sourceFileResolver: sourceFiles('STORE_ALL_BUILD')
                 }
             }
         }
