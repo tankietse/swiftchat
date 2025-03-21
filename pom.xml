@@ -71,6 +71,12 @@
                         <parameters>true</parameters>
                     </configuration>
                 </plugin>
+                <!-- Add JaCoCo plugin management -->
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>0.8.11</version>
+                </plugin>
             </plugins>
         </pluginManagement>
     </build>
