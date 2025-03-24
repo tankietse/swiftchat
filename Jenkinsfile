@@ -261,15 +261,21 @@ pipeline {
                 dir('auth-service') {
                     script {
                         if (env.DOCKER_AVAILABLE == 'true') {
-                            sh '${MVN_CMD} test'
+                            // Change test to verify to ensure JaCoCo report is generated
+                            sh '${MVN_CMD} verify'
                         } else {
-                            sh 'mvn test'
+                            sh 'mvn verify'
                         }
                     }
                     junit '**/target/surefire-reports/*.xml'
-                    // Replace deprecated jacoco with publishCoverage
-                    publishCoverage adapters: [jacocoAdapter('target/jacoco.exec')],
-                        sourceFileResolver: sourceFiles('STORE_ALL_BUILD')
+                    // Replace publishCoverage with recordCoverage
+                    recordCoverage(
+                        tools: [[parser: 'JACOCO', pattern: 'target/site/jacoco/jacoco.xml']], 
+                        id: 'jacoco', 
+                        name: 'JaCoCo Coverage', 
+                        sourceDirectories: ['src/main/java'], 
+                        sourceCodeRetention: 'EVERY_BUILD'
+                    )
                 }
             }
         }

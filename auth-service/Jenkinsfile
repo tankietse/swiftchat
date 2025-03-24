@@ -85,16 +85,21 @@ pipeline {
             steps {
                 script {
                     try {
-                        // Use a simpler test command and wrap in quotes to avoid script parsing issues
-                        sh "${MVN_CMD} -pl . test -DforkCount=0 -Dtest='*Test' -Dsurefire.rerunFailingTestsCount=1"
+                        // Change test to verify to ensure JaCoCo report is generated
+                        sh "${MVN_CMD} -pl . verify -DforkCount=0 -Dtest='*Test' -Dsurefire.rerunFailingTestsCount=1"
                         
                         // Process test results in a separate step to isolate potential issues
                         junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
                         
-                        // Replace deprecated jacoco with publishCoverage
+                        // Replace publishCoverage with recordCoverage
                         echo "Generating coverage report"
-                        publishCoverage adapters: [jacocoAdapter('target/jacoco.exec')],
-                            sourceFileResolver: sourceFiles('STORE_ALL_BUILD')
+                        recordCoverage(
+                            tools: [[parser: 'JACOCO', pattern: 'target/site/jacoco/jacoco.xml']], 
+                            id: 'jacoco', 
+                            name: 'JaCoCo Coverage', 
+                            sourceDirectories: ['src/main/java'], 
+                            sourceCodeRetention: 'EVERY_BUILD'
+                        )
                     } catch (Exception e) {
                         echo "Warning: Test execution had issues: ${e.message}"
                         currentBuild.result = 'UNSTABLE'
