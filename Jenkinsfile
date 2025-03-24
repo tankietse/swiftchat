@@ -261,20 +261,18 @@ pipeline {
                 dir('auth-service') {
                     script {
                         if (env.DOCKER_AVAILABLE == 'true') {
-                            // Change test to verify to ensure JaCoCo report is generated
+                            // Keep the verify command to generate JaCoCo reports
                             sh '${MVN_CMD} verify'
                         } else {
                             sh 'mvn verify'
                         }
                     }
                     junit '**/target/surefire-reports/*.xml'
-                    // Replace publishCoverage with recordCoverage
+                    
+                    // Simplified recordCoverage configuration
                     recordCoverage(
-                        tools: [[parser: 'JACOCO', pattern: 'target/site/jacoco/jacoco.xml']], 
-                        id: 'jacoco', 
-                        name: 'JaCoCo Coverage', 
-                        sourceDirectories: ['src/main/java'], 
-                        sourceCodeRetention: 'EVERY_BUILD'
+                        tools: [[parser: 'JACOCO']],
+                        qualityGates: [[threshold: 50, metric: 'LINE', unstable: true]]
                     )
                 }
             }

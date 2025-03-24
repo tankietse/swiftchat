@@ -85,20 +85,17 @@ pipeline {
             steps {
                 script {
                     try {
-                        // Change test to verify to ensure JaCoCo report is generated
+                        // Keep the verify command to generate JaCoCo reports
                         sh "${MVN_CMD} -pl . verify -DforkCount=0 -Dtest='*Test' -Dsurefire.rerunFailingTestsCount=1"
                         
                         // Process test results in a separate step to isolate potential issues
                         junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
                         
-                        // Replace publishCoverage with recordCoverage
+                        // Simplified recordCoverage configuration
                         echo "Generating coverage report"
                         recordCoverage(
-                            tools: [[parser: 'JACOCO', pattern: 'target/site/jacoco/jacoco.xml']], 
-                            id: 'jacoco', 
-                            name: 'JaCoCo Coverage', 
-                            sourceDirectories: ['src/main/java'], 
-                            sourceCodeRetention: 'EVERY_BUILD'
+                            tools: [[parser: 'JACOCO']],
+                            qualityGates: [[threshold: 50, metric: 'LINE', unstable: true]]
                         )
                     } catch (Exception e) {
                         echo "Warning: Test execution had issues: ${e.message}"
